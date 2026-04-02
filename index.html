@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -173,7 +173,7 @@ const { useState, useEffect, useCallback } = React;
 // ── SUPABASE ──────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://pnodoheckpndksnfnjel.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBub2RvaGVjcG5ka3NvbmZuamVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjIwMjcsImV4cCI6MjA5MDY5ODAyN30.afLv5x4Cu290qkUSigiwkrFEn9Vtvfv342tngzoRsv0";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = supabase.createClient ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function timeAgo(ts) {
