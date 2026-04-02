@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -170,10 +170,37 @@
 <script type="text/babel">
 const { useState, useEffect, useCallback } = React;
 
-// ── SUPABASE ──────────────────────────────────────────────────────────────────
+// ── SUPABASE REST API (no SDK needed) ─────────────────────────────────────────
 const SUPABASE_URL = "https://pnodoheckpndksnfnjel.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBub2RvaGVjcG5ka3NvbmZuamVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjIwMjcsImV4cCI6MjA5MDY5ODAyN30.afLv5x4Cu290qkUSigiwkrFEn9Vtvfv342tngzoRsv0";
-const sb = supabase.createClient ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const HEADERS = {
+  "apikey": SUPABASE_KEY,
+  "Authorization": `Bearer ${SUPABASE_KEY}`,
+  "Content-Type": "application/json",
+  "Prefer": "return=representation",
+};
+
+const sb = {
+  async select(query) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: HEADERS });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  async insert(table, data) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: "POST", headers: HEADERS, body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  async count(table) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
+      headers: { ...HEADERS, "Prefer": "count=exact", "Range-Unit": "items", "Range": "0-0" }
+    });
+    return res.headers.get("content-range")?.split("/")[1] || "—";
+  }
+};
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function timeAgo(ts) {
@@ -264,17 +291,14 @@ function HomePage({ onSearch }) {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      // cheapest per item
-      const { data } = await sb.from("prices").select("*").order("price", { ascending: true }).limit(40);
-      if (data) {
-        const seen = {};
-        const cheap = [];
+      try {
+        const data = await sb.select("prices?select=*&order=price.asc&limit=40");
+        const seen = {}, cheap = [];
         data.forEach(r => { if (!seen[r.item]) { seen[r.item] = true; cheap.push(r); } });
         setCheapest(cheap);
-      }
-      // most recent
-      const { data: rec } = await sb.from("prices").select("*").order("timestamp", { ascending: false }).limit(3);
-      if (rec) setRecent(rec);
+        const rec = await sb.select("prices?select=*&order=timestamp.desc&limit=3");
+        setRecent(rec);
+      } catch(e) { console.error(e); }
       setLoading(false);
     }
     load();
@@ -355,9 +379,10 @@ function ResultsPage({ itemId }) {
   useEffect(() => {
     async function load() {
       setLoading(true); setError(null);
-      const { data, error: err } = await sb.from("prices").select("*").eq("item", itemId).order("price", { ascending: true });
-      if (err) { setError(err.message); }
-      else { setPrices(data || []); }
+      try {
+        const data = await sb.select(`prices?select=*&item=eq.${itemId}&order=price.asc`);
+        setPrices(data || []);
+      } catch(e) { setError(e.message); }
       setLoading(false);
     }
     load();
@@ -423,15 +448,15 @@ function AddPage({ onSubmit }) {
   async function handleSubmit() {
     if (!valid) return;
     setSubmitting(true); setError(null);
-    const { error: err } = await sb.from("prices").insert([{
-      item, price: Number(price), store, area,
-      confidence: 80,
-      verified: false,
-      timestamp: new Date().toISOString(),
-    }]);
-    setSubmitting(false);
-    if (err) { setError(err.message); return; }
-    onSubmit();
+    try {
+      await sb.insert("prices", {
+        item, price: Number(price), store, area,
+        confidence: 80, verified: false,
+        timestamp: new Date().toISOString(),
+      });
+      setSubmitting(false);
+      onSubmit();
+    } catch(e) { setError(e.message); setSubmitting(false); }
   }
 
   return (
@@ -504,23 +529,20 @@ function InsightsPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data } = await sb.from("prices").select("*").eq("item", activeItem).eq("area", area).order("timestamp", { ascending: true }).limit(50);
-      if (data && data.length > 0) {
-        // group into up to 7 buckets
-        const prices = data.map(d => Number(d.price));
-        const chunk  = Math.ceil(prices.length / 7);
-        const buckets = [];
-        for (let i = 0; i < 7; i++) {
-          const slice = prices.slice(i * chunk, (i + 1) * chunk);
-          buckets.push(slice.length ? Math.round(slice.reduce((a,b) => a+b,0)/slice.length) : (buckets[buckets.length-1] || prices[0]));
-        }
-        setChartData(buckets);
-        const minP = Math.min(...prices), maxP = Math.max(...prices);
-        setSavings(maxP - minP);
-      } else {
-        setChartData([]);
-        setSavings(0);
-      }
+      try {
+        const data = await sb.select(`prices?select=price,timestamp&item=eq.${activeItem}&area=eq.${area}&order=timestamp.asc&limit=50`);
+        if (data && data.length > 0) {
+          const prices = data.map(d => Number(d.price));
+          const chunk = Math.ceil(prices.length / 7);
+          const buckets = [];
+          for (let i = 0; i < 7; i++) {
+            const slice = prices.slice(i * chunk, (i + 1) * chunk);
+            buckets.push(slice.length ? Math.round(slice.reduce((a,b) => a+b,0)/slice.length) : (buckets[buckets.length-1] || prices[0]));
+          }
+          setChartData(buckets);
+          setSavings(Math.max(...prices) - Math.min(...prices));
+        } else { setChartData([]); setSavings(0); }
+      } catch(e) { setChartData([]); setSavings(0); }
       setLoading(false);
     }
     load();
@@ -577,7 +599,7 @@ function InsightsPage() {
 function ProfilePage() {
   const [count, setCount] = useState("—");
   useEffect(() => {
-    sb.from("prices").select("*", { count: "exact", head: true }).then(({ count: c }) => { if (c !== null) setCount(c); });
+    sb.count("prices").then(c => setCount(c));
   }, []);
 
   const badges = [
