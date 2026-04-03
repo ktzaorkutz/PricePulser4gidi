@@ -242,6 +242,13 @@ const sb = {
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
+  },
+  async rpc(fn, params) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: "POST", headers: HEADERS, body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
   }
 };
 
@@ -497,41 +504,14 @@ function AddPage({ onSubmit }) {
     if (!valid) return;
     setSubmitting(true); setError(null);
     try {
-      // Check if same item + store + area already exists within last 48h
-      const existing = await sb.select(
-        "prices?select=id,confidence,price&item=eq." + item +
-        "&store=eq." + encodeURIComponent(store) +
-        "&area=eq." + area +
-        "&order=timestamp.desc&limit=1"
-      );
-
-      if (existing && existing.length > 0) {
-        const match = existing[0];
-        const priceDiff = Math.abs(Number(price) - Number(match.price)) / Number(match.price);
-
-        if (priceDiff <= 0.05) {
-          // Price within 5% — same price confirmed, boost confidence (cap at 99)
-          const newConf = Math.min(99, Math.round(match.confidence + 5));
-          await sb.patch("prices", match.id, {
-            confidence: newConf,
-            price: Number(price),
-            timestamp: new Date().toISOString(),
-          });
-          setSubmitting(false);
-          onSubmit("boosted");
-          return;
-        }
-        // Price differs by more than 5% — list as new entry (price has changed)
-      }
-
-      // No match — insert fresh
-      await sb.insert("prices", {
-        item, price: Number(price), store, area,
-        confidence: 80, verified: false,
-        timestamp: new Date().toISOString(),
+      const result = await sb.rpc("upsert_price", {
+        p_item:  item,
+        p_price: Number(price),
+        p_store: store.trim(),
+        p_area:  area.trim(),
       });
       setSubmitting(false);
-      onSubmit("new");
+      onSubmit(result.action === "boosted" ? "boosted" : "new");
     } catch(e) { setError(e.message); setSubmitting(false); }
   }
 
