@@ -199,6 +199,22 @@
   .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 14px; }
   .empty-icon { font-size: 36px; margin-bottom: 10px; }
   .error-banner { margin: 0 20px 12px; background: rgba(255,59,59,0.08); border: 1px solid rgba(255,59,59,0.2); border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #ff8080; }
+  .auth-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 32px 20px; background: var(--bg); }
+  .auth-logo { font-family: var(--font-head); font-size: 32px; font-weight: 800; text-align: center; margin-bottom: 4px; }
+  .auth-logo span { color: var(--green); }
+  .auth-tagline { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 40px; }
+  .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 24px 20px; }
+  .auth-tabs { display: flex; margin-bottom: 24px; background: var(--surface2); border-radius: 12px; padding: 4px; }
+  .auth-tab { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--muted); transition: all 0.2s; font-family: var(--font-body); border: none; background: none; }
+  .auth-tab.active { background: var(--green); color: #000; }
+  .auth-field { margin-bottom: 14px; }
+  .auth-input { width: 100%; background: var(--bg); border: 1.5px solid var(--border); border-radius: 12px; padding: 13px 16px; font-family: var(--font-body); font-size: 15px; color: var(--text); outline: none; transition: border-color 0.2s; }
+  .auth-input:focus { border-color: var(--green); }
+  .auth-btn { width: 100%; background: var(--green); color: #000; border: none; border-radius: 14px; padding: 15px; font-family: var(--font-head); font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 8px; transition: all 0.2s; box-shadow: 0 4px 20px rgba(0,196,140,0.3); }
+  .auth-btn:hover { background: var(--green-dark); }
+  .auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .auth-error { background: rgba(255,59,59,0.08); border: 1px solid rgba(255,59,59,0.2); border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #ff8080; margin-bottom: 12px; }
+  .auth-footer { text-align: center; font-size: 12px; color: var(--muted); margin-top: 20px; }
 </style>
 </head>
 <body>
@@ -206,49 +222,98 @@
 <script type="text/babel">
 const { useState, useEffect, useCallback } = React;
 
-// ── SUPABASE REST API (no SDK needed) ─────────────────────────────────────────
+// ── SUPABASE REST API ─────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://pnodohecpndksonfnjel.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBub2RvaGVjcG5ka3NvbmZuamVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjIwMjcsImV4cCI6MjA5MDY5ODAyN30.afLv5x4Cu290qkUSigiwkrFEn9Vtvfv342tngzoRsv0";
 
-const HEADERS = {
-  "apikey": SUPABASE_KEY,
-  "Authorization": `Bearer ${SUPABASE_KEY}`,
-  "Content-Type": "application/json",
-  "Prefer": "return=representation",
-};
+// Auth token stored in memory — refreshed on login
+let AUTH_TOKEN = null;
+
+function getHeaders(extra = {}) {
+  return {
+    "apikey": SUPABASE_KEY,
+    "Authorization": `Bearer ${AUTH_TOKEN || SUPABASE_KEY}`,
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+    ...extra,
+  };
+}
 
 const sb = {
   async select(query) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: HEADERS });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: getHeaders() });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },
   async insert(table, data) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-      method: "POST", headers: HEADERS, body: JSON.stringify(data),
+      method: "POST", headers: getHeaders(), body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },
   async count(table) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
-      headers: { ...HEADERS, "Prefer": "count=exact", "Range-Unit": "items", "Range": "0-0" }
+      headers: getHeaders({ "Prefer": "count=exact", "Range-Unit": "items", "Range": "0-0" })
     });
     return res.headers.get("content-range")?.split("/")[1] || "—";
   },
   async patch(table, id, data) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
-      method: "PATCH", headers: HEADERS, body: JSON.stringify(data),
+      method: "PATCH", headers: getHeaders(), body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },
   async rpc(fn, params) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
-      method: "POST", headers: HEADERS, body: JSON.stringify(params),
+      method: "POST", headers: getHeaders(), body: JSON.stringify(params),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
+  },
+  // ── AUTH ────────────────────────────────────────────────────────────────────
+  async signUp(email, password, name) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: "POST",
+      headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, data: { name } }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message || data.msg);
+    if (data.access_token) {
+      AUTH_TOKEN = data.access_token;
+      localStorage.setItem("pp_token", data.access_token);
+      localStorage.setItem("pp_user", JSON.stringify({ id: data.user.id, email, name }));
+    }
+    return data;
+  },
+  async signIn(email, password) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message || data.msg || "Invalid email or password");
+    AUTH_TOKEN = data.access_token;
+    localStorage.setItem("pp_token", data.access_token);
+    const name = data.user?.user_metadata?.name || email.split("@")[0];
+    localStorage.setItem("pp_user", JSON.stringify({ id: data.user.id, email, name }));
+    return data;
+  },
+  signOut() {
+    AUTH_TOKEN = null;
+    localStorage.removeItem("pp_token");
+    localStorage.removeItem("pp_user");
+  },
+  getUser() {
+    try { return JSON.parse(localStorage.getItem("pp_user")); } catch { return null; }
+  },
+  restoreSession() {
+    const token = localStorage.getItem("pp_token");
+    if (token) AUTH_TOKEN = token;
+    return this.getUser();
   }
 };
 
@@ -551,7 +616,7 @@ function ResultsPage({ itemId }) {
 }
 
 // ── ADD PAGE ──────────────────────────────────────────────────────────────────
-function AddPage({ onSubmit }) {
+function AddPage({ onSubmit, user }) {
   const [item,         setItem]         = useState("");
   const [price,        setPrice]        = useState("");
   const [store,        setStore]        = useState("");
@@ -574,7 +639,13 @@ function AddPage({ onSubmit }) {
         p_area:        area.trim(),
         p_clearance:   isClearance,
         p_expiry_date: isClearance && expiryDate ? expiryDate : null,
+        p_user_id:     user?.id || null,
       });
+      // Award points to user profile
+      if (user?.id) {
+        const pts = result.action === "boosted" ? 10 : 25;
+        sb.rpc("award_points", { p_user_id: user.id, p_points: pts }).catch(() => {});
+      }
       setSubmitting(false);
       onSubmit(result.action === "boosted" ? "boosted" : "new");
     } catch(e) { setError(e.message); setSubmitting(false); }
@@ -759,62 +830,154 @@ function InsightsPage() {
   );
 }
 
+// ── AUTH PAGE ─────────────────────────────────────────────────────────────────
+function AuthPage({ onAuth }) {
+  const [mode,       setMode]       = useState("login");
+  const [name,       setName]       = useState("");
+  const [email,      setEmail]      = useState("");
+  const [password,   setPassword]   = useState("");
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState(null);
+
+  async function handle() {
+    if (!email || !password) return;
+    if (mode === "signup" && !name) return;
+    setLoading(true); setError(null);
+    try {
+      if (mode === "signup") {
+        await sb.signUp(email, password, name);
+      } else {
+        await sb.signIn(email, password);
+      }
+      onAuth(sb.getUser());
+    } catch(e) { setError(e.message); }
+    setLoading(false);
+  }
+
+  return (
+    <div className="auth-page">
+      <div className="auth-logo">Price<span>Pulse</span></div>
+      <div className="auth-tagline">Find the cheapest prices in Lagos</div>
+      <div className="auth-card">
+        <div className="auth-tabs">
+          <button className={"auth-tab " + (mode==="login"?"active":"")} onClick={() => { setMode("login"); setError(null); }}>Log In</button>
+          <button className={"auth-tab " + (mode==="signup"?"active":"")} onClick={() => { setMode("signup"); setError(null); }}>Sign Up</button>
+        </div>
+
+        {error && <div className="auth-error">⚠️ {error}</div>}
+
+        {mode === "signup" && (
+          <div className="auth-field">
+            <input className="auth-input" placeholder="Your name" value={name}
+              onChange={e => setName(e.target.value)} />
+          </div>
+        )}
+        <div className="auth-field">
+          <input className="auth-input" type="email" placeholder="Email address" value={email}
+            onChange={e => setEmail(e.target.value)} />
+        </div>
+        <div className="auth-field">
+          <input className="auth-input" type="password" placeholder="Password" value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handle()} />
+        </div>
+
+        <button className="auth-btn" onClick={handle} disabled={loading}>
+          {loading ? "Please wait..." : mode === "signup" ? "Create Account →" : "Log In →"}
+        </button>
+      </div>
+      <div className="auth-footer">
+        By signing up you help Lagos find better prices 🌍
+      </div>
+    </div>
+  );
+}
+
 // ── PROFILE PAGE ──────────────────────────────────────────────────────────────
-function ProfilePage() {
-  const [count,       setCount]       = useState("—");
-  const [userSubmits, setUserSubmits] = useState("—");
+function ProfilePage({ user, onSignOut }) {
+  const [profile,     setProfile]     = useState(null);
+  const [mySubmits,   setMySubmits]   = useState("—");
+  const [totalPrices, setTotalPrices] = useState("—");
   const [avgConf,     setAvgConf]     = useState("—");
 
   useEffect(() => {
-    // Total prices in DB
-    sb.count("prices").then(c => setCount(c));
-    // Total user submissions (unverified = user submitted)
-    sb.select("prices?select=id&verified=eq.false").then(data => {
-      if (data) setUserSubmits(data.length);
+    if (!user) return;
+    // Load profile from DB
+    sb.select("profiles?id=eq." + user.id).then(data => {
+      if (data && data.length > 0) setProfile(data[0]);
     }).catch(() => {});
-    // Average confidence score
+    // My submissions
+    sb.select("prices?select=id&user_id=eq." + user.id).then(data => {
+      if (data) setMySubmits(data.length);
+    }).catch(() => {});
+    // Total prices
+    sb.count("prices").then(c => setTotalPrices(c));
+    // Avg confidence
     sb.select("prices?select=confidence").then(data => {
       if (data && data.length > 0) {
         const avg = Math.round(data.reduce((s,p) => s + Number(p.confidence), 0) / data.length);
         setAvgConf(avg + "%");
       }
     }).catch(() => {});
-  }, []);
+  }, [user]);
+
+  if (!user) return null;
+
+  const displayName = profile?.name || user.name || user.email?.split("@")[0] || "User";
+  const points      = profile?.points || 0;
+  const initials    = displayName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
+  const rank        = points >= 500 ? "🥇 Gold Reporter" : points >= 200 ? "🥈 Silver Reporter" : points >= 50 ? "🥉 Bronze Reporter" : "🌱 Newcomer";
+  const nextRank    = points >= 500 ? 1000 : points >= 200 ? 500 : points >= 50 ? 200 : 50;
+  const xpPct       = Math.min(100, Math.round((points / nextRank) * 100));
 
   const badges = [
-    { icon:"🏆", name:"Top Reporter", earned:true  },
-    { icon:"🔥", name:"7-day streak", earned:true  },
-    { icon:"⚡", name:"Fast Finder",  earned:true  },
-    { icon:"🌍", name:"Explorer",     earned:false },
-    { icon:"💎", name:"Diamond",      earned:false },
+    { icon:"🏆", name:"Top Reporter", earned: mySubmits >= 10  },
+    { icon:"🔥", name:"First Report", earned: mySubmits >= 1   },
+    { icon:"⚡", name:"Fast Finder",  earned: mySubmits >= 5   },
+    { icon:"🌍", name:"Explorer",     earned: mySubmits >= 20  },
+    { icon:"💎", name:"Diamond",      earned: points  >= 1000  },
   ];
+
   return (
     <div className="page">
       <div className="profile-hero">
-        <div className="avatar">TK</div>
-        <div className="profile-name">Tunde Kareem</div>
-        <div className="profile-rank">⭐ Gold Reporter · Yaba</div>
+        <div className="avatar">{initials}</div>
+        <div className="profile-name">{displayName}</div>
+        <div className="profile-rank">{rank} · {profile?.area || "Yaba"}</div>
       </div>
       <div className="rank-card">
-        <div className="rank-row"><span className="rank-label">Total Points</span><span className="rank-val" style={{color:"var(--yellow)"}}>2,480 pts</span></div>
-        <div className="rank-row"><span className="rank-label">Rank</span><span className="rank-val">#14 in Yaba</span></div>
-        <div className="xp-bar"><div className="xp-fill" /></div>
-        <div className="xp-note">520 pts to Platinum rank</div>
+        <div className="rank-row">
+          <span className="rank-label">Total Points</span>
+          <span className="rank-val" style={{color:"var(--yellow)"}}>{points} pts</span>
+        </div>
+        <div className="rank-row">
+          <span className="rank-label">My Submissions</span>
+          <span className="rank-val">{mySubmits}</span>
+        </div>
+        <div className="xp-bar"><div className="xp-fill" style={{width: xpPct + "%"}} /></div>
+        <div className="xp-note">{nextRank - points} pts to next rank</div>
       </div>
       <div className="stats-grid">
-        <div className="stat-box"><div className="stat-val" style={{color:"var(--green)"}}>{count}</div><div className="stat-lbl">Total Prices</div></div>
-        <div className="stat-box"><div className="stat-val" style={{color:"var(--orange)"}}>{userSubmits}</div><div className="stat-lbl">User Submissions</div></div>
-        <div className="stat-box"><div className="stat-val" style={{color:"var(--yellow)"}}>{avgConf}</div><div className="stat-lbl">Avg Confidence</div></div>
-        <div className="stat-box"><div className="stat-val" style={{color:"var(--text)"}}>Yaba</div><div className="stat-lbl">Focus Area</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--green)"}}>{mySubmits}</div><div className="stat-lbl">My Reports</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--orange)"}}>{totalPrices}</div><div className="stat-lbl">Total in DB</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--yellow)"}}>{points}</div><div className="stat-lbl">My Points</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--text)"}}>{avgConf}</div><div className="stat-lbl">Avg Confidence</div></div>
       </div>
       <div className="section-label">Badges</div>
       <div className="badge-row">
         {badges.map((b, i) => (
-          <div key={i} className={`badge ${b.earned?"earned":""}`}>
+          <div key={i} className={"badge " + (b.earned?"earned":"")}>
             <span className="badge-icon">{b.icon}</span>
             <span className="badge-name">{b.name}</span>
           </div>
         ))}
+      </div>
+      <div style={{padding:"0 20px 20px"}}>
+        <button onClick={onSignOut} style={{
+          width:"100%", background:"transparent", border:"1px solid var(--border)",
+          borderRadius:12, padding:"12px", color:"var(--muted)", fontSize:13,
+          cursor:"pointer", fontFamily:"var(--font-body)", marginTop:8
+        }}>Sign Out</button>
       </div>
     </div>
   );
@@ -825,44 +988,63 @@ function App() {
   const [tab,         setTab]         = useState("home");
   const [searchItem,  setSearchItem]  = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [user,        setUser]        = useState(() => sb.restoreSession());
 
   const handleSearch = (id) => { setSearchItem(id); setTab("results"); };
   const handleSubmit = (type) => { setShowSuccess(type || "new"); };
+  const handleAuth   = (u)    => { setUser(u); setTab("home"); };
+  const handleSignOut = ()    => { sb.signOut(); setUser(null); setTab("home"); };
 
   useEffect(() => { if (tab !== "results") setSearchItem(null); }, [tab]);
+
+  // Show auth screen if not logged in and tapping Add or Profile
+  const requiresAuth = (t) => (t === "add" || t === "profile") && !user;
+  const handleTabClick = (t) => {
+    if (requiresAuth(t)) { setTab("auth"); return; }
+    setTab(t);
+  };
+
+  if (tab === "auth") return (
+    <div className="app">
+      <AuthPage onAuth={handleAuth} />
+    </div>
+  );
 
   return (
     <div className="app">
       <div className="nav">
         <div className="nav-logo">Price<span>Pulse</span></div>
-        <div className="nav-location"><span>📍</span> Yaba, Lagos ▾</div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {user && <div style={{fontSize:12,color:"var(--green)",fontWeight:600}}>{user.name || user.email?.split("@")[0]}</div>}
+          <div className="nav-location"><span>📍</span> Yaba ▾</div>
+        </div>
       </div>
 
       {tab === "home"     && <HomePage    onSearch={handleSearch} />}
       {tab === "results"  && <ResultsPage itemId={searchItem || "rice"} />}
-      {tab === "add"      && <AddPage     onSubmit={handleSubmit} />}
+      {tab === "add"      && <AddPage     onSubmit={handleSubmit} user={user} />}
       {tab === "insights" && <InsightsPage />}
-      {tab === "profile"  && <ProfilePage />}
+      {tab === "profile"  && <ProfilePage user={user} onSignOut={handleSignOut} />}
 
       <div className="bottom-nav">
-        <div className={`nav-item ${tab==="home"?"active":""}`} onClick={() => setTab("home")}>
+        <div className={`nav-item ${tab==="home"?"active":""}`} onClick={() => handleTabClick("home")}>
           <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>
           Home
         </div>
-        <div className={`nav-item ${tab==="results"?"active":""}`} onClick={() => { setSearchItem("rice"); setTab("results"); }}>
+        <div className={`nav-item ${tab==="results"?"active":""}`} onClick={() => { setSearchItem("rice"); handleTabClick("results"); }}>
           <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           Search
         </div>
-        <div className="nav-item" onClick={() => setTab("add")}>
+        <div className="nav-item" onClick={() => handleTabClick("add")}>
           <div className="add-circle">
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
           </div>
         </div>
-        <div className={`nav-item ${tab==="insights"?"active":""}`} onClick={() => setTab("insights")}>
+        <div className={`nav-item ${tab==="insights"?"active":""}`} onClick={() => handleTabClick("insights")}>
           <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
           Insights
         </div>
-        <div className={`nav-item ${tab==="profile"?"active":""}`} onClick={() => setTab("profile")}>
+        <div className={`nav-item ${tab==="profile"?"active":""}`} onClick={() => handleTabClick("profile")}>
           <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
           Profile
         </div>
