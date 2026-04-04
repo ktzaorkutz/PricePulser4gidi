@@ -310,6 +310,7 @@ function PriceCard({ item, topPick, clearance, daysLeft }) {
           <div className="store-name">{item.store}</div>
           <div className="store-meta">
             <span className="store-area">📍 {item.area}</span>
+            {item.item && <span style={{fontSize:11,background:"var(--surface2)",padding:"2px 7px",borderRadius:10,color:"var(--muted)",textTransform:"capitalize"}}>{item.item}</span>}
           </div>
         </div>
         <div style={{textAlign:"right"}}>
@@ -760,9 +761,24 @@ function InsightsPage() {
 
 // ── PROFILE PAGE ──────────────────────────────────────────────────────────────
 function ProfilePage() {
-  const [count, setCount] = useState("—");
+  const [count,       setCount]       = useState("—");
+  const [userSubmits, setUserSubmits] = useState("—");
+  const [avgConf,     setAvgConf]     = useState("—");
+
   useEffect(() => {
+    // Total prices in DB
     sb.count("prices").then(c => setCount(c));
+    // Total user submissions (unverified = user submitted)
+    sb.select("prices?select=id&verified=eq.false").then(data => {
+      if (data) setUserSubmits(data.length);
+    }).catch(() => {});
+    // Average confidence score
+    sb.select("prices?select=confidence").then(data => {
+      if (data && data.length > 0) {
+        const avg = Math.round(data.reduce((s,p) => s + Number(p.confidence), 0) / data.length);
+        setAvgConf(avg + "%");
+      }
+    }).catch(() => {});
   }, []);
 
   const badges = [
@@ -786,10 +802,10 @@ function ProfilePage() {
         <div className="xp-note">520 pts to Platinum rank</div>
       </div>
       <div className="stats-grid">
-        <div className="stat-box"><div className="stat-val" style={{color:"var(--green)"}}>47</div><div className="stat-lbl">Prices Reported</div></div>
-        <div className="stat-box"><div className="stat-val" style={{color:"var(--orange)"}}>312</div><div className="stat-lbl">Helpful Votes</div></div>
-        <div className="stat-box"><div className="stat-val" style={{color:"var(--yellow)"}}>7</div><div className="stat-lbl">Day Streak 🔥</div></div>
-        <div className="stat-box"><div className="stat-val" style={{color:"var(--text)"}}>{count}</div><div className="stat-lbl">Total DB Prices</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--green)"}}>{count}</div><div className="stat-lbl">Total Prices</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--orange)"}}>{userSubmits}</div><div className="stat-lbl">User Submissions</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--yellow)"}}>{avgConf}</div><div className="stat-lbl">Avg Confidence</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--text)"}}>Yaba</div><div className="stat-lbl">Focus Area</div></div>
       </div>
       <div className="section-label">Badges</div>
       <div className="badge-row">
