@@ -280,12 +280,18 @@ const sb = {
       body: JSON.stringify({ email, password, data: { name } }),
     });
     const data = await res.json();
-    if (data.error) throw new Error(data.error.message || data.msg);
-    if (data.access_token) {
-      AUTH_TOKEN = data.access_token;
-      localStorage.setItem("pp_token", data.access_token);
-      localStorage.setItem("pp_user", JSON.stringify({ id: data.user.id, email, name }));
+    if (!res.ok || data.error || data.error_description) {
+      throw new Error(data.error_description || data.error?.message || data.msg || "Sign up failed");
     }
+    if (!data.access_token) throw new Error("Account created! Please log in.");
+    AUTH_TOKEN = data.access_token;
+    const user = data.user || data.data?.user || {};
+    const userId = user.id || user.sub || null;
+    if (!userId) throw new Error("Sign up succeeded but could not read user — please log in.");
+    const userObj = { id: userId, email: user.email || email, name };
+    localStorage.setItem("pp_token", data.access_token);
+    localStorage.setItem("pp_refresh", data.refresh_token || "");
+    localStorage.setItem("pp_user", JSON.stringify(userObj));
     return data;
   },
   async signIn(email, password) {
@@ -295,11 +301,20 @@ const sb = {
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json();
-    if (data.error) throw new Error(data.error.message || data.msg || "Invalid email or password");
+    if (!res.ok || data.error || data.error_description) {
+      throw new Error(data.error_description || data.error?.message || data.msg || "Invalid email or password");
+    }
+    if (!data.access_token) throw new Error("Login failed — please try again");
     AUTH_TOKEN = data.access_token;
+    // Supabase can return user in different places depending on version
+    const user = data.user || data.data?.user || {};
+    const userId = user.id || user.sub || null;
+    if (!userId) throw new Error("Could not read user ID — please try again");
+    const name = user.user_metadata?.name || user.email?.split("@")[0] || email.split("@")[0];
+    const userObj = { id: userId, email: user.email || email, name };
     localStorage.setItem("pp_token", data.access_token);
-    const name = data.user?.user_metadata?.name || email.split("@")[0];
-    localStorage.setItem("pp_user", JSON.stringify({ id: data.user.id, email, name }));
+    localStorage.setItem("pp_refresh", data.refresh_token || "");
+    localStorage.setItem("pp_user", JSON.stringify(userObj));
     return data;
   },
   signOut() {
