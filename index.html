@@ -675,22 +675,267 @@ function ResultsPage({ itemId, userCoords }) {
 }
 
 // ── ADD PAGE ──────────────────────────────────────────────────────────────────
-function AddPage({ onSubmit, user }) {
-  const [item,         setItem]         = useState("");
-  const [price,        setPrice]        = useState("");
-  const [store,        setStore]        = useState("");
-  const [area,         setArea]         = useState("");
-  const [isClearance,  setIsClearance]  = useState(false);
-  const [expiryDate,   setExpiryDate]   = useState("");
-  const [submitting,   setSubmitting]   = useState(false);
-  const [error,        setError]        = useState(null);
+// ── PIN DROP MODAL ───────────────────────────────────────────────────────────
+function PinDropModal({ storeName, area, initialCoords, onSave, onClose }) {
+  const mapRef = React.useRef(null);
+  const [pin, setPin] = useState(initialCoords || null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const leafletMap = React.useRef(null);
+  const marker = React.useRef(null);
 
-  const valid = item && price && store && area && !submitting;
+  // Lagos center as default
+  const DEFAULT = { lat: 6.5244, lng: 3.3792 };
+
+  useEffect(() => {
+    // Load Leaflet CSS + JS
+    if (!document.getElementById("leaflet-css")) {
+      const css = document.createElement("link");
+      css.id = "leaflet-css";
+      css.rel = "stylesheet";
+      css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(css);
+    }
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload = () => setMapLoaded(true);
+    document.head.appendChild(script);
+    return () => {};
+  }, []);
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current || leafletMap.current) return;
+    const L = window.L;
+    const center = initialCoords || DEFAULT;
+
+    leafletMap.current = L.map(mapRef.current, { zoomControl: true }).setView(
+      [center.lat, center.lng], 16
+    );
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap"
+    }).addTo(leafletMap.current);
+
+    // Custom green pin icon
+    const icon = L.divIcon({
+      html: '<div style="width:32px;height:32px;background:#00C48C;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>',
+      iconSize: [32, 32], iconAnchor: [16, 32], className: ""
+    });
+
+    if (initialCoords) {
+      marker.current = L.marker([initialCoords.lat, initialCoords.lng], { icon, draggable: true })
+        .addTo(leafletMap.current);
+      marker.current.on("dragend", e => {
+        const p = e.target.getLatLng();
+        setPin({ lat: p.lat, lng: p.lng });
+      });
+    }
+
+    leafletMap.current.on("click", e => {
+      const coords = { lat: e.latlng.lat, lng: e.latlng.lng };
+      setPin(coords);
+      if (marker.current) {
+        marker.current.setLatLng([coords.lat, coords.lng]);
+      } else {
+        marker.current = L.marker([coords.lat, coords.lng], { icon, draggable: true })
+          .addTo(leafletMap.current);
+        marker.current.on("dragend", ev => {
+          const p = ev.target.getLatLng();
+          setPin({ lat: p.lat, lng: p.lng });
+        });
+      }
+    });
+
+    // Try to center on store via geocoding
+    if (storeName && area) {
+      setSearching(true);
+      const q = encodeURIComponent(storeName + ", " + area + ", Lagos, Nigeria");
+      fetch("https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=ng")
+        .then(r => r.json())
+        .then(data => {
+          if (data && data[0]) {
+            const c = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+            leafletMap.current.setView([c.lat, c.lng], 17);
+            // Auto-place pin if found
+            setPin(c);
+            const ic = L.divIcon({
+              html: '<div style="width:32px;height:32px;background:#00C48C;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>',
+              iconSize: [32, 32], iconAnchor: [16, 32], className: ""
+            });
+            if (marker.current) marker.current.setLatLng([c.lat, c.lng]);
+            else {
+              marker.current = L.marker([c.lat, c.lng], { icon: ic, draggable: true })
+                .addTo(leafletMap.current);
+              marker.current.on("dragend", ev => {
+                const p = ev.target.getLatLng();
+                setPin({ lat: p.lat, lng: p.lng });
+              });
+            }
+          }
+          setSearching(false);
+        }).catch(() => setSearching(false));
+    }
+  }, [mapLoaded]);
+
+  return (
+    <div style={{
+      position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",
+      display:"flex",flexDirection:"column",zIndex:9999
+    }}>
+      {/* Header */}
+      <div style={{
+        background:"var(--surface)",padding:"16px 20px",
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        borderBottom:"1px solid var(--border)",flexShrink:0
+      }}>
+        <div>
+          <div style={{fontFamily:"var(--font-head)",fontSize:16,fontWeight:800}}>📍 Pin the Store</div>
+          <div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>{storeName} · {area}</div>
+        </div>
+        <button onClick={onClose} style={{
+          background:"var(--surface2)",border:"1px solid var(--border)",
+          borderRadius:8,padding:"6px 12px",color:"var(--muted)",
+          cursor:"pointer",fontSize:13,fontFamily:"var(--font-body)"
+        }}>Cancel</button>
+      </div>
+
+      {/* Map */}
+      <div style={{flex:1,position:"relative"}}>
+        {!mapLoaded && (
+          <div style={{
+            position:"absolute",inset:0,display:"flex",alignItems:"center",
+            justifyContent:"center",flexDirection:"column",gap:12,
+            background:"var(--bg)",zIndex:10
+          }}>
+            <div className="spinner" style={{width:28,height:28}} />
+            <div style={{fontSize:13,color:"var(--muted)"}}>Loading map...</div>
+          </div>
+        )}
+        {searching && (
+          <div style={{
+            position:"absolute",top:12,left:"50%",transform:"translateX(-50%)",
+            background:"rgba(0,0,0,0.8)",color:"var(--text)",padding:"8px 16px",
+            borderRadius:20,fontSize:12,zIndex:1000,display:"flex",gap:6,alignItems:"center"
+          }}>
+            <div className="spinner" style={{width:12,height:12,borderWidth:1.5}} />
+            Searching for store...
+          </div>
+        )}
+        <div ref={mapRef} style={{width:"100%",height:"100%"}} />
+
+        {/* Instruction overlay */}
+        {!pin && mapLoaded && (
+          <div style={{
+            position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",
+            background:"rgba(0,0,0,0.8)",color:"var(--text)",padding:"10px 20px",
+            borderRadius:20,fontSize:13,zIndex:1000,textAlign:"center",
+            pointerEvents:"none",whiteSpace:"nowrap"
+          }}>
+            Tap the map to drop a pin
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        background:"var(--surface)",padding:"16px 20px 32px",
+        borderTop:"1px solid var(--border)",flexShrink:0
+      }}>
+        {pin ? (
+          <>
+            <div style={{fontSize:12,color:"var(--green)",marginBottom:10,fontWeight:600}}>
+              ✅ Pin placed — drag to adjust precisely
+            </div>
+            <div style={{fontSize:11,color:"var(--muted)",marginBottom:14}}>
+              {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
+            </div>
+            <button onClick={() => onSave(pin)} style={{
+              width:"100%",background:"var(--green)",color:"#000",border:"none",
+              borderRadius:14,padding:"15px",fontFamily:"var(--font-head)",
+              fontSize:16,fontWeight:800,cursor:"pointer"
+            }}>
+              Confirm Location →
+            </button>
+          </>
+        ) : (
+          <div style={{fontSize:13,color:"var(--muted)",textAlign:"center"}}>
+            Tap anywhere on the map to mark the store location
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AddPage({ onSubmit, user }) {
+  const [item,          setItem]          = useState("");
+  const [price,         setPrice]         = useState("");
+  const [store,         setStore]         = useState("");
+  const [area,          setArea]          = useState("");
+  const [isClearance,   setIsClearance]   = useState(false);
+  const [expiryDate,    setExpiryDate]    = useState("");
+  const [submitting,    setSubmitting]    = useState(false);
+  const [error,         setError]         = useState(null);
+
+  // Store matching state
+  const [storeStatus,   setStoreStatus]   = useState(null); // null | "found" | "new" | "checking"
+  const [matchedStore,  setMatchedStore]  = useState(null); // matched store object from DB
+  const [storeCoords,   setStoreCoords]   = useState(null); // { lat, lng } from pin drop
+  const [showPinDrop,   setShowPinDrop]   = useState(false);
+  const [storeId,       setStoreId]       = useState(null);
+
+  const valid = item && price && store && area && !submitting &&
+    (storeStatus === "found" || (storeStatus === "new" && storeCoords));
+
+  // Check store against DB when name + area are both filled
+  useEffect(() => {
+    if (!store.trim() || !area) { setStoreStatus(null); setMatchedStore(null); return; }
+    const timer = setTimeout(async () => {
+      setStoreStatus("checking");
+      try {
+        const matches = await sb.rpc("find_matching_store", {
+          p_name: store.trim(), p_area: area.trim()
+        });
+        if (matches && matches.length > 0 && matches[0].similarity_score > 0.5) {
+          setMatchedStore(matches[0]);
+          setStoreId(matches[0].id);
+          setStoreCoords(matches[0].lat ? { lat: matches[0].lat, lng: matches[0].lng } : null);
+          setStoreStatus("found");
+        } else {
+          setMatchedStore(null);
+          setStoreId(null);
+          setStoreCoords(null);
+          setStoreStatus("new");
+        }
+      } catch(e) {
+        setStoreStatus("new");
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [store, area]);
 
   async function handleSubmit() {
     if (!valid) return;
     setSubmitting(true); setError(null);
     try {
+      // If new store — save to stores table first
+      let finalStoreId = storeId;
+      if (storeStatus === "new" && storeCoords) {
+        const newStore = await sb.insert("stores", {
+          name: store.trim(),
+          area: area.trim(),
+          lat:  storeCoords.lat,
+          lng:  storeCoords.lng,
+          verification_status: "unverified",
+          created_by: user?.id || null,
+          report_count: 1,
+        });
+        if (newStore && newStore[0]) finalStoreId = newStore[0].id;
+      } else if (storeStatus === "found" && storeId) {
+        // Increment report count on existing store
+        await sb.rpc("increment_store_count", { p_store_id: storeId }).catch(() => {});
+      }
+
       const result = await sb.rpc("upsert_price", {
         p_item:        item,
         p_price:       Number(price),
@@ -700,15 +945,17 @@ function AddPage({ onSubmit, user }) {
         p_expiry_date: isClearance && expiryDate ? expiryDate : null,
         p_user_id:     user?.id || null,
       });
-      // Award points to user profile
+
       if (user?.id) {
         const pts = result.action === "boosted" ? 10 : 25;
-        sb.rpc("award_points", { p_user_id: user.id, p_points: pts }).catch(() => {});
+        await sb.rpc("add_points", { p_user_id: user.id, p_points: pts }).catch(() => {});
       }
       setSubmitting(false);
       onSubmit(result.action === "boosted" ? "boosted" : "new");
     } catch(e) { setError(e.message); setSubmitting(false); }
   }
+
+  const AREAS = ["Yaba","Lekki","Ikeja","Surulere","Oshodi","Mafoluku","Mushin","VI","Ajah","Gbagada","Festac","Ketu"];
 
   return (
     <div className="page">
@@ -731,50 +978,106 @@ function AddPage({ onSubmit, user }) {
         <label className="form-label">Price (₦)</label>
         <div className="price-input-wrap">
           <span className="naira-sign">₦</span>
-          <input className="form-input" type="number" placeholder="0" value={price} onChange={e => setPrice(e.target.value)} />
+          <input className="form-input" type="number" placeholder="0" value={price}
+            onChange={e => setPrice(e.target.value)} />
         </div>
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">Store / Market Name</label>
-        <input className="form-input" placeholder="e.g. Mama Ngozi Provisions" value={store} onChange={e => setStore(e.target.value)} />
       </div>
 
       <div className="form-group">
         <label className="form-label">Area</label>
         <select className="form-select" value={area} onChange={e => setArea(e.target.value)}>
           <option value="">Select area...</option>
-          <option>Yaba</option><option>Lekki</option><option>Ikeja</option>
-          <option>Surulere</option><option>Oshodi</option>
+          {AREAS.map(a => <option key={a}>{a}</option>)}
         </select>
       </div>
 
       <div className="form-group">
-        <label className="form-label">Clearance Item?</label>
-        <div
-          onClick={() => setIsClearance(!isClearance)}
-          style={{
-            display:"flex", alignItems:"center", justifyContent:"space-between",
-            background:"var(--surface)", border:"1.5px solid " + (isClearance ? "var(--orange)" : "var(--border)"),
-            borderRadius:12, padding:"13px 16px", cursor:"pointer", transition:"border-color 0.2s"
+        <label className="form-label">Store / Market Name</label>
+        <input className="form-input"
+          placeholder="e.g. Mama Ngozi Provisions"
+          value={store}
+          onChange={e => { setStore(e.target.value); setStoreStatus(null); }}
+        />
+
+        {storeStatus === "checking" && (
+          <div style={{marginTop:8,fontSize:12,color:"var(--muted)",display:"flex",alignItems:"center",gap:6}}>
+            <div className="spinner" style={{width:12,height:12,borderWidth:1.5}} /> Checking store database...
+          </div>
+        )}
+
+        {storeStatus === "found" && matchedStore && (
+          <div style={{
+            marginTop:8,background:"rgba(0,196,140,0.08)",border:"1px solid rgba(0,196,140,0.25)",
+            borderRadius:10,padding:"10px 12px",fontSize:13
           }}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+              <span>{matchedStore.verification_status === "community_verified" ? "✅" :
+                     matchedStore.verification_status === "located" ? "📍" : "🔍"}</span>
+              <b style={{color:"var(--green)"}}>{matchedStore.name}</b>
+            </div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>
+              {matchedStore.verification_status === "community_verified" ? "Community verified store" :
+               matchedStore.verification_status === "located" ? "Store location confirmed" :
+               "Unverified — help us confirm this store"}
+              {matchedStore.lat && <span> · 📍 Location on file</span>}
+            </div>
+            {!matchedStore.lat && (
+              <div style={{marginTop:6,fontSize:11,color:"var(--orange)",cursor:"pointer",fontWeight:600}}
+                onClick={() => setShowPinDrop(true)}>
+                + Drop a pin to add this store's location (+15 pts)
+              </div>
+            )}
+          </div>
+        )}
+
+        {storeStatus === "new" && store.trim().length > 2 && area && (
+          <div style={{
+            marginTop:8,background:"rgba(255,107,43,0.08)",border:"1px solid rgba(255,107,43,0.2)",
+            borderRadius:10,padding:"10px 12px",fontSize:13
+          }}>
+            <div style={{fontWeight:600,color:"var(--orange)",marginBottom:4}}>🆕 New store</div>
+            <div style={{fontSize:11,color:"var(--muted)",marginBottom:8}}>
+              We don't have <b>{store.trim()}</b> in our database yet.
+              Drop a pin so others can find it. <b style={{color:"var(--yellow)"}}>+20 bonus pts!</b>
+            </div>
+            {storeCoords ? (
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{fontSize:11,color:"var(--green)",fontWeight:600}}>
+                  ✅ Pin dropped — {storeCoords.lat.toFixed(4)}, {storeCoords.lng.toFixed(4)}
+                </div>
+                <span style={{fontSize:11,color:"var(--muted)",cursor:"pointer"}}
+                  onClick={() => setShowPinDrop(true)}>Edit</span>
+              </div>
+            ) : (
+              <button onClick={() => setShowPinDrop(true)} style={{
+                background:"var(--orange)",color:"#fff",border:"none",borderRadius:8,
+                padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",
+                fontFamily:"var(--font-body)",width:"100%"
+              }}>
+                📍 Drop a Pin for this Store
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Clearance Item?</label>
+        <div onClick={() => setIsClearance(!isClearance)} style={{
+          display:"flex",alignItems:"center",justifyContent:"space-between",
+          background:"var(--surface)",border:"1.5px solid " + (isClearance?"var(--orange)":"var(--border)"),
+          borderRadius:12,padding:"13px 16px",cursor:"pointer",transition:"border-color 0.2s"
+        }}>
           <div>
-            <div style={{fontSize:13,fontWeight:600,color: isClearance ? "var(--orange)" : "var(--text)"}}>
+            <div style={{fontSize:13,fontWeight:600,color:isClearance?"var(--orange)":"var(--text)"}}>
               🏷️ Mark as Clearance
             </div>
             <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>Item is near expiry and discounted</div>
           </div>
-          <div style={{
-            width:44, height:24, borderRadius:12, transition:"background 0.2s",
-            background: isClearance ? "var(--orange)" : "var(--border)",
-            position:"relative", flexShrink:0
-          }}>
-            <div style={{
-              position:"absolute", top:3,
-              left: isClearance ? 22 : 3,
-              width:18, height:18, borderRadius:"50%",
-              background:"#fff", transition:"left 0.2s"
-            }}/>
+          <div style={{width:44,height:24,borderRadius:12,transition:"background 0.2s",
+            background:isClearance?"var(--orange)":"var(--border)",position:"relative",flexShrink:0}}>
+            <div style={{position:"absolute",top:3,left:isClearance?22:3,
+              width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.2s"}}/>
           </div>
         </div>
       </div>
@@ -782,13 +1085,8 @@ function AddPage({ onSubmit, user }) {
       {isClearance && (
         <div className="form-group">
           <label className="form-label">Expiry Date</label>
-          <input
-            className="form-input"
-            type="date"
-            value={expiryDate}
-            onChange={e => setExpiryDate(e.target.value)}
-            style={{colorScheme:"dark"}}
-          />
+          <input className="form-input" type="date" value={expiryDate}
+            onChange={e => setExpiryDate(e.target.value)} style={{colorScheme:"dark"}} />
         </div>
       )}
 
@@ -804,9 +1102,29 @@ function AddPage({ onSubmit, user }) {
       <button className="submit-btn" onClick={handleSubmit} disabled={!valid}>
         {submitting ? "Submitting..." : "Submit Price Report →"}
       </button>
+
+      {storeStatus === "new" && !storeCoords && (
+        <div style={{margin:"8px 20px 0",fontSize:12,color:"var(--orange)",textAlign:"center"}}>
+          Drop a pin for the new store to submit
+        </div>
+      )}
+
       <div className="points-preview">
-        <span>🏅</span><span>You'll earn <b>+25 points</b> for this submission</span>
+        <span>🏅</span>
+        <span>Earn <b>+{storeStatus==="new"?45:25} points</b> for this submission
+          {storeStatus==="new" && <span style={{color:"var(--yellow)"}}> (incl. +20 new store bonus!)</span>}
+        </span>
       </div>
+
+      {showPinDrop && (
+        <PinDropModal
+          storeName={store}
+          area={area}
+          initialCoords={storeCoords}
+          onSave={coords => { setStoreCoords(coords); setShowPinDrop(false); }}
+          onClose={() => setShowPinDrop(false)}
+        />
+      )}
     </div>
   );
 }
