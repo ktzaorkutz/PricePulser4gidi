@@ -705,14 +705,10 @@ function ResultsPage({ itemId, userCoords }) {
   useEffect(() => {
     if (!prices.length) { setPricesWithDist([]); return; }
     async function attachDistances() {
-      // Fetch all store records for this item's area in one query
-      const storeNames = [...new Set(prices.map(p => p.store.trim()))];
+      // Fetch all store records — no area filter so any user location gets correct distances
       let storeMap = {};
       try {
-        const storeRows = await sb.select(
-          "stores?select=name,lat,lng,verification_status&area=ilike." +
-          encodeURIComponent(prices[0].area || "Yaba")
-        );
+        const storeRows = await sb.select("stores?select=name,lat,lng,area,verification_status&limit=500");
         if (storeRows) {
           storeRows.forEach(s => {
             storeMap[s.name.toLowerCase().trim()] = s;
@@ -1668,14 +1664,17 @@ function LocationModal({ current, onSave, onClose }) {
         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         fetch(
           "https://nominatim.openstreetmap.org/reverse?lat=" + coords.lat +
-          "&lon=" + coords.lng + "&format=json",
+          "&lon=" + coords.lng + "&format=json&zoom=14",
           { headers: { "Accept-Language": "en" } }
         )
           .then(r => r.json())
           .then(d => {
-            const name = d.address?.suburb || d.address?.neighbourhood ||
-                         d.address?.city_district || d.address?.town || "Lagos";
-            onSave(name, coords);
+            const a = d.address || {};
+            const name = a.suburb || a.neighbourhood || a.quarter ||
+                         a.city_district || a.district || a.town ||
+                         a.village || a.county || "Lagos";
+            const clean = name.replace(/\s*local government area\s*/i, "").trim();
+            onSave(clean, coords);
           }).catch(() => onSave("Lagos", coords));
         setLocating(false);
       },
@@ -1793,20 +1792,35 @@ function App() {
   useEffect(() => {
     const saved = localStorage.getItem("pp_coords");
     const savedName = localStorage.getItem("pp_locname");
-    if (saved) { setUserCoords(JSON.parse(saved)); setLocName(savedName || "Lagos"); return; }
+    // If saved name is just "Lagos" (too generic), re-detect properly
+    if (saved && savedName && savedName !== "Lagos") {
+      setUserCoords(JSON.parse(saved));
+      setLocName(savedName);
+      return;
+    }
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => {
           const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           setUserCoords(coords);
           localStorage.setItem("pp_coords", JSON.stringify(coords));
-          // Reverse geocode area name
-          fetch("https://nominatim.openstreetmap.org/reverse?lat=" + coords.lat + "&lon=" + coords.lng + "&format=json")
+          // Reverse geocode area name — try multiple fields for Lagos specificity
+          fetch(
+            "https://nominatim.openstreetmap.org/reverse?lat=" + coords.lat +
+            "&lon=" + coords.lng + "&format=json&zoom=14",
+            { headers: { "Accept-Language": "en" } }
+          )
             .then(r => r.json())
             .then(d => {
-              const name = d.address?.suburb || d.address?.neighbourhood || d.address?.city_district || "Lagos";
-              setLocName(name);
-              localStorage.setItem("pp_locname", name);
+              const a = d.address || {};
+              // Lagos areas can appear in different fields — pick most specific
+              const name = a.suburb || a.neighbourhood || a.quarter ||
+                           a.city_district || a.district || a.town ||
+                           a.village || a.county || "Lagos";
+              // Clean up — remove "Local Government Area" suffix if present
+              const clean = name.replace(/\s*local government area\s*/i, "").trim();
+              setLocName(clean);
+              localStorage.setItem("pp_locname", clean);
             }).catch(() => {});
         },
         () => setShowLocModal(true) // permission denied — show manual entry
