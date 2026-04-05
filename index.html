@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -7,7 +6,6 @@
 <title>PricePulse Lagos</title>
 
 <!-- PWA META -->
-
 <meta name="application-name" content="PricePulse" />
 <meta name="description" content="Find the cheapest prices for rice, eggs, bread and more near you in Lagos." />
 <meta name="theme-color" content="#00C48C" />
@@ -17,7 +15,6 @@
 <meta name="apple-mobile-web-app-title" content="PricePulse" />
 
 <!-- OPEN GRAPH (WhatsApp / Twitter previews) -->
-
 <meta property="og:title" content="PricePulse Lagos — Find Cheapest Prices Near You" />
 <meta property="og:description" content="See where to buy the cheapest rice, eggs, bread and Indomie in Lagos right now. Free. No signup." />
 <meta property="og:type" content="website" />
@@ -27,12 +24,10 @@
 <meta name="twitter:description" content="Find the cheapest market prices in Lagos. Free. No signup needed." />
 
 <!-- ICONS (inline SVG as data URI so no extra files needed) -->
-
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230D0D0D'/><text y='.9em' font-size='72' x='50%' dominant-baseline='middle' text-anchor='middle' dy='0.1em'>⚡</text></svg>" />
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230D0D0D'/><text y='.9em' font-size='72' x='50%' dominant-baseline='middle' text-anchor='middle' dy='0.1em'>⚡</text></svg>" />
 
 <!-- MANIFEST (inline so no extra file needed) -->
-
 <link rel="manifest" href="data:application/manifest+json,{
   %22name%22:%22PricePulse Lagos%22,
   %22short_name%22:%22PricePulse%22,
@@ -221,7 +216,6 @@
   .auth-error { background: rgba(255,59,59,0.08); border: 1px solid rgba(255,59,59,0.2); border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #ff8080; margin-bottom: 12px; }
   .auth-footer { text-align: center; font-size: 12px; color: var(--muted); margin-top: 20px; }
 </style>
-
 </head>
 <body>
 <div id="root"></div>
@@ -229,1208 +223,1186 @@
 const { useState, useEffect, useCallback } = React;
 
 // ── SUPABASE REST API ─────────────────────────────────────────────────────────
-const SUPABASE_URL = “https://pnodohecpndksonfnjel.supabase.co”;
-const SUPABASE_KEY = “eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBub2RvaGVjcG5ka3NvbmZuamVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjIwMjcsImV4cCI6MjA5MDY5ODAyN30.afLv5x4Cu290qkUSigiwkrFEn9Vtvfv342tngzoRsv0”;
+const SUPABASE_URL = "https://pnodohecpndksonfnjel.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBub2RvaGVjcG5ka3NvbmZuamVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjIwMjcsImV4cCI6MjA5MDY5ODAyN30.afLv5x4Cu290qkUSigiwkrFEn9Vtvfv342tngzoRsv0";
 
 // Auth token stored in memory — refreshed on login
 let AUTH_TOKEN = null;
 
 function getHeaders(extra = {}) {
-return {
-“apikey”: SUPABASE_KEY,
-“Authorization”: `Bearer ${AUTH_TOKEN || SUPABASE_KEY}`,
-“Content-Type”: “application/json”,
-“Prefer”: “return=representation”,
-…extra,
-};
+  return {
+    "apikey": SUPABASE_KEY,
+    "Authorization": `Bearer ${AUTH_TOKEN || SUPABASE_KEY}`,
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+    ...extra,
+  };
 }
 
 const sb = {
-async select(query) {
-const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: getHeaders() });
-if (!res.ok) throw new Error(await res.text());
-return res.json();
-},
-async insert(table, data) {
-const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-method: “POST”, headers: getHeaders(), body: JSON.stringify(data),
-});
-if (!res.ok) throw new Error(await res.text());
-return res.json();
-},
-async count(table) {
-const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
-headers: getHeaders({ “Prefer”: “count=exact”, “Range-Unit”: “items”, “Range”: “0-0” })
-});
-return res.headers.get(“content-range”)?.split(”/”)[1] || “—”;
-},
-async patch(table, id, data) {
-const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
-method: “PATCH”, headers: getHeaders(), body: JSON.stringify(data),
-});
-if (!res.ok) throw new Error(await res.text());
-return res.json();
-},
-async rpc(fn, params) {
-const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
-method: “POST”, headers: getHeaders(), body: JSON.stringify(params),
-});
-if (!res.ok) throw new Error(await res.text());
-return res.json();
-},
-// ── AUTH ────────────────────────────────────────────────────────────────────
-async signUp(email, password, name) {
-const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-method: “POST”,
-headers: { “apikey”: SUPABASE_KEY, “Content-Type”: “application/json” },
-body: JSON.stringify({ email, password, data: { name } }),
-});
-const data = await res.json();
-if (!res.ok || data.error || data.error_description) {
-throw new Error(data.error_description || data.error?.message || data.msg || “Sign up failed”);
-}
-if (!data.access_token) throw new Error(“Account created! Please log in.”);
-AUTH_TOKEN = data.access_token;
-const user = data.user || data.data?.user || {};
-const userId = user.id || user.sub || null;
-if (!userId) throw new Error(“Sign up succeeded but could not read user — please log in.”);
-const userObj = { id: userId, email: user.email || email, name };
-localStorage.setItem(“pp_token”, data.access_token);
-localStorage.setItem(“pp_refresh”, data.refresh_token || “”);
-localStorage.setItem(“pp_user”, JSON.stringify(userObj));
-return data;
-},
-async signIn(email, password) {
-const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-method: “POST”,
-headers: { “apikey”: SUPABASE_KEY, “Content-Type”: “application/json” },
-body: JSON.stringify({ email, password }),
-});
-const data = await res.json();
-if (!res.ok || data.error || data.error_description) {
-throw new Error(data.error_description || data.error?.message || data.msg || “Invalid email or password”);
-}
-if (!data.access_token) throw new Error(“Login failed — please try again”);
-AUTH_TOKEN = data.access_token;
-// Supabase can return user in different places depending on version
-const user = data.user || data.data?.user || {};
-const userId = user.id || user.sub || null;
-if (!userId) throw new Error(“Could not read user ID — please try again”);
-const name = user.user_metadata?.name || user.email?.split(”@”)[0] || email.split(”@”)[0];
-const userObj = { id: userId, email: user.email || email, name };
-localStorage.setItem(“pp_token”, data.access_token);
-localStorage.setItem(“pp_refresh”, data.refresh_token || “”);
-localStorage.setItem(“pp_user”, JSON.stringify(userObj));
-return data;
-},
-signOut() {
-AUTH_TOKEN = null;
-localStorage.removeItem(“pp_token”);
-localStorage.removeItem(“pp_user”);
-},
-getUser() {
-try { return JSON.parse(localStorage.getItem(“pp_user”)); } catch { return null; }
-},
-restoreSession() {
-try {
-const token = localStorage.getItem(“pp_token”);
-// Validate token has 3 parts (valid JWT)
-if (token && token.split(”.”).length === 3) {
-AUTH_TOKEN = token;
-} else {
-// Bad token — clear everything
-localStorage.removeItem(“pp_token”);
-localStorage.removeItem(“pp_refresh”);
-localStorage.removeItem(“pp_user”);
-AUTH_TOKEN = null;
-return null;
-}
-} catch(e) {
-AUTH_TOKEN = null;
-}
-return this.getUser();
-}
+  async select(query) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  async insert(table, data) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: "POST", headers: getHeaders(), body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  async count(table) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
+      headers: getHeaders({ "Prefer": "count=exact", "Range-Unit": "items", "Range": "0-0" })
+    });
+    return res.headers.get("content-range")?.split("/")[1] || "—";
+  },
+  async patch(table, id, data) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: "PATCH", headers: getHeaders(), body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  async rpc(fn, params) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: "POST", headers: getHeaders(), body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+  // ── AUTH ────────────────────────────────────────────────────────────────────
+  async signUp(email, password, name) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: "POST",
+      headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, data: { name } }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error || data.error_description) {
+      throw new Error(data.error_description || data.error?.message || data.msg || "Sign up failed");
+    }
+    if (!data.access_token) throw new Error("Account created! Please log in.");
+    AUTH_TOKEN = data.access_token;
+    const user = data.user || data.data?.user || {};
+    const userId = user.id || user.sub || null;
+    if (!userId) throw new Error("Sign up succeeded but could not read user — please log in.");
+    const userObj = { id: userId, email: user.email || email, name };
+    localStorage.setItem("pp_token", data.access_token);
+    localStorage.setItem("pp_refresh", data.refresh_token || "");
+    localStorage.setItem("pp_user", JSON.stringify(userObj));
+    return data;
+  },
+  async signIn(email, password) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error || data.error_description) {
+      throw new Error(data.error_description || data.error?.message || data.msg || "Invalid email or password");
+    }
+    if (!data.access_token) throw new Error("Login failed — please try again");
+    AUTH_TOKEN = data.access_token;
+    // Supabase can return user in different places depending on version
+    const user = data.user || data.data?.user || {};
+    const userId = user.id || user.sub || null;
+    if (!userId) throw new Error("Could not read user ID — please try again");
+    const name = user.user_metadata?.name || user.email?.split("@")[0] || email.split("@")[0];
+    const userObj = { id: userId, email: user.email || email, name };
+    localStorage.setItem("pp_token", data.access_token);
+    localStorage.setItem("pp_refresh", data.refresh_token || "");
+    localStorage.setItem("pp_user", JSON.stringify(userObj));
+    return data;
+  },
+  signOut() {
+    AUTH_TOKEN = null;
+    localStorage.removeItem("pp_token");
+    localStorage.removeItem("pp_user");
+  },
+  getUser() {
+    try { return JSON.parse(localStorage.getItem("pp_user")); } catch { return null; }
+  },
+  restoreSession() {
+    try {
+      const token = localStorage.getItem("pp_token");
+      // Validate token has 3 parts (valid JWT)
+      if (token && token.split(".").length === 3) {
+        AUTH_TOKEN = token;
+      } else {
+        // Bad token — clear everything
+        localStorage.removeItem("pp_token");
+        localStorage.removeItem("pp_refresh");
+        localStorage.removeItem("pp_user");
+        AUTH_TOKEN = null;
+        return null;
+      }
+    } catch(e) {
+      AUTH_TOKEN = null;
+    }
+    return this.getUser();
+  }
 };
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function timeAgo(ts) {
-if (!ts) return “recently”;
-const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
-const mins  = Math.floor(diff / 60);
-const hours = Math.floor(diff / 3600);
-const days  = Math.floor(diff / 86400);
-const weeks = Math.floor(diff / 604800);
-if (diff < 60)  return mins === 0 ? “just now” : “1 min ago”;
-if (mins < 60)  return mins + “ min” + (mins === 1 ? “” : “s”) + “ ago”;
-if (hours < 24) return hours + “ hour” + (hours === 1 ? “” : “s”) + “ ago”;
-if (days < 7)   return days + “ day” + (days === 1 ? “” : “s”) + “ ago”;
-return weeks + “ week” + (weeks === 1 ? “” : “s”) + “ ago”;
+  if (!ts) return "recently";
+  const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
+  const mins  = Math.floor(diff / 60);
+  const hours = Math.floor(diff / 3600);
+  const days  = Math.floor(diff / 86400);
+  const weeks = Math.floor(diff / 604800);
+  if (diff < 60)  return mins === 0 ? "just now" : "1 min ago";
+  if (mins < 60)  return mins + " min" + (mins === 1 ? "" : "s") + " ago";
+  if (hours < 24) return hours + " hour" + (hours === 1 ? "" : "s") + " ago";
+  if (days < 7)   return days + " day" + (days === 1 ? "" : "s") + " ago";
+  return weeks + " week" + (weeks === 1 ? "" : "s") + " ago";
 }
 
 function getConf(c) {
-if (c >= 90) return { color: “#00C48C”, label: “High” };
-if (c >= 75) return { color: “#FFD600”, label: “Med”  };
-return { color: “#FF6B2B”, label: “Low” };
+  if (c >= 90) return { color: "#00C48C", label: "High" };
+  if (c >= 75) return { color: "#FFD600", label: "Med"  };
+  return { color: "#FF6B2B", label: "Low" };
 }
 
 const ITEMS = [
-{ id: “rice”,    label: “Rice (1 cup)”,   icon: “🍚” },
-{ id: “eggs”,    label: “Eggs (crate)”,   icon: “🥚” },
-{ id: “bread”,   label: “Bread (loaf)”,   icon: “🍞” },
-{ id: “indomie”, label: “Indomie (pack)”, icon: “🍜” },
-{ id: “beans”,   label: “Beans (paint)”,  icon: “🫘” },
-{ id: “tomato”,  label: “Tomatoes (5)”,   icon: “🍅” },
+  { id: "rice",    label: "Rice (1 cup)",   icon: "🍚" },
+  { id: "eggs",    label: "Eggs (crate)",   icon: "🥚" },
+  { id: "bread",   label: "Bread (loaf)",   icon: "🍞" },
+  { id: "indomie", label: "Indomie (pack)", icon: "🍜" },
+  { id: "beans",   label: "Beans (paint)",  icon: "🫘" },
+  { id: "tomato",  label: "Tomatoes (5)",   icon: "🍅" },
 ];
 
-const DAYS = [“Mon”,“Tue”,“Wed”,“Thu”,“Fri”,“Sat”,“Sun”];
+const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
 // ── COMPONENTS ────────────────────────────────────────────────────────────────
 function Spinner() {
-return <div className="loading-state"><div className="spinner"/><span>Loading prices…</span></div>;
+  return <div className="loading-state"><div className="spinner"/><span>Loading prices...</span></div>;
 }
 
 function PriceCard({ item, topPick, clearance, daysLeft, distance }) {
-const conf = getConf(item.confidence);
-const isExpiringSoon = daysLeft !== null && daysLeft !== undefined && daysLeft <= 3;
-const cardBorder = clearance ? “var(–orange)” : topPick ? “var(–green)” : undefined;
+  const conf = getConf(item.confidence);
+  const isExpiringSoon = daysLeft !== null && daysLeft !== undefined && daysLeft <= 3;
+  const cardBorder = clearance ? "var(--orange)" : topPick ? "var(--green)" : undefined;
 
-return (
-<div className={“price-card “ + (topPick ? “top-pick” : “”)}
-style={cardBorder ? {borderColor: cardBorder} : {}}>
-{topPick && !clearance && <div className="top-badge">⚡ Best Price</div>}
-{clearance && (
-<div className=“top-badge” style={{background:“var(–orange)”}}>
-🏷️ {daysLeft !== null && daysLeft !== undefined
-? daysLeft <= 0 ? “Expires today!” : “Expires in “ + daysLeft + “ day” + (daysLeft===1?””:“s”)
-: “Clearance”}
-</div>
-)}
-<div className="card-top">
-<div>
-<div className="store-name">{item.store}</div>
-<div className="store-meta">
-<span className="store-area">📍 {item.area}</span>
-{distance && <span style={{fontSize:11,background:“var(–surface2)”,padding:“2px 7px”,borderRadius:10,color:“var(–green)”,fontWeight:600}}>{distance}</span>}
-{item.item && <span style={{fontSize:11,background:“var(–surface2)”,padding:“2px 7px”,borderRadius:10,color:“var(–muted)”,textTransform:“capitalize”}}>{item.item}</span>}
-</div>
-</div>
-<div style={{textAlign:“right”}}>
-<div className=“price-main” style={{color: clearance ? “var(–orange)” : “var(–green)”}}>
-₦{Number(item.price).toLocaleString()}
-</div>
-{clearance && <div style={{fontSize:10,color:“var(–orange)”,fontWeight:700,marginTop:2}}>CLEARANCE</div>}
-</div>
-</div>
-<div className="card-bottom">
-<div className="confidence">
-<div className="conf-bar">
-<div className=“conf-fill” style={{width: item.confidence + “%”, background:conf.color}} />
-</div>
-<span className="conf-label" style={{color:conf.color}}>{item.confidence}% {conf.label}</span>
-</div>
-<span className="timestamp">🕐 {timeAgo(item.timestamp)}</span>
-</div>
-{isExpiringSoon && (
-<div style={{marginTop:8,paddingTop:8,borderTop:“1px solid var(–border)”,fontSize:11,color:“var(–orange)”,fontWeight:600}}>
-⚠️ Grab it fast — expires very soon!
-</div>
-)}
-</div>
-);
+  return (
+    <div className={"price-card " + (topPick ? "top-pick" : "")}
+      style={cardBorder ? {borderColor: cardBorder} : {}}>
+      {topPick && !clearance && <div className="top-badge">⚡ Best Price</div>}
+      {clearance && (
+        <div className="top-badge" style={{background:"var(--orange)"}}>
+          🏷️ {daysLeft !== null && daysLeft !== undefined
+            ? daysLeft <= 0 ? "Expires today!" : "Expires in " + daysLeft + " day" + (daysLeft===1?"":"s")
+            : "Clearance"}
+        </div>
+      )}
+      <div className="card-top">
+        <div>
+          <div className="store-name">{item.store}</div>
+          <div className="store-meta">
+            <span className="store-area">📍 {item.area}</span>
+            {distance && <span style={{fontSize:11,background:"var(--surface2)",padding:"2px 7px",borderRadius:10,color:"var(--green)",fontWeight:600}}>{distance}</span>}
+            {item.item && <span style={{fontSize:11,background:"var(--surface2)",padding:"2px 7px",borderRadius:10,color:"var(--muted)",textTransform:"capitalize"}}>{item.item}</span>}
+          </div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div className="price-main" style={{color: clearance ? "var(--orange)" : "var(--green)"}}>
+            ₦{Number(item.price).toLocaleString()}
+          </div>
+          {clearance && <div style={{fontSize:10,color:"var(--orange)",fontWeight:700,marginTop:2}}>CLEARANCE</div>}
+        </div>
+      </div>
+      <div className="card-bottom">
+        <div className="confidence">
+          <div className="conf-bar">
+            <div className="conf-fill" style={{width: item.confidence + "%", background:conf.color}} />
+          </div>
+          <span className="conf-label" style={{color:conf.color}}>{item.confidence}% {conf.label}</span>
+        </div>
+        <span className="timestamp">🕐 {timeAgo(item.timestamp)}</span>
+      </div>
+      {isExpiringSoon && (
+        <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid var(--border)",fontSize:11,color:"var(--orange)",fontWeight:600}}>
+          ⚠️ Grab it fast — expires very soon!
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MiniBarChart({ data, color }) {
-const max = Math.max(…data), min = Math.min(…data);
-return (
-<div className="mini-chart">
-{data.map((v, i) => {
-const h = 16 + ((v - min) / (max - min || 1)) * 64;
-const isLast = i === data.length - 1;
-return (
-<div key={i} className=“bar” style={{height:h, background: isLast ? color : “rgba(255,255,255,0.06)”}}>
-<span className="bar-label">{DAYS[i]}</span>
-</div>
-);
-})}
-</div>
-);
+  const max = Math.max(...data), min = Math.min(...data);
+  return (
+    <div className="mini-chart">
+      {data.map((v, i) => {
+        const h = 16 + ((v - min) / (max - min || 1)) * 64;
+        const isLast = i === data.length - 1;
+        return (
+          <div key={i} className="bar" style={{height:h, background: isLast ? color : "rgba(255,255,255,0.06)"}}>
+            <span className="bar-label">{DAYS[i]}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── HOME PAGE ─────────────────────────────────────────────────────────────────
 function HomePage({ onSearch }) {
-const [query,     setQuery]     = useState(””);
-const [showSugg,  setShowSugg]  = useState(false);
-const [cheapest,  setCheapest]  = useState([]);
-const [recent,    setRecent]    = useState([]);
-const [loading,   setLoading]   = useState(true);
+  const [query,     setQuery]     = useState("");
+  const [showSugg,  setShowSugg]  = useState(false);
+  const [cheapest,  setCheapest]  = useState([]);
+  const [recent,    setRecent]    = useState([]);
+  const [loading,   setLoading]   = useState(true);
 
-useEffect(() => {
-async function load() {
-setLoading(true);
-try {
-const data = await sb.select(“prices?select=*&order=price.asc&limit=40”);
-const seen = {}, cheap = [];
-data.forEach(r => { if (!seen[r.item]) { seen[r.item] = true; cheap.push(r); } });
-setCheapest(cheap);
-const rec = await sb.select(“prices?select=*&order=timestamp.desc&limit=3”);
-setRecent(rec);
-} catch(e) { console.error(e); }
-setLoading(false);
-}
-load();
-}, []);
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const data = await sb.select("prices?select=*&order=price.asc&limit=40");
+        const seen = {}, cheap = [];
+        data.forEach(r => { if (!seen[r.item]) { seen[r.item] = true; cheap.push(r); } });
+        setCheapest(cheap);
+        const rec = await sb.select("prices?select=*&order=timestamp.desc&limit=3");
+        setRecent(rec);
+      } catch(e) { console.error(e); }
+      setLoading(false);
+    }
+    load();
+  }, []);
 
-const filtered = ITEMS.filter(i => i.label.toLowerCase().includes(query.toLowerCase()) && query.length > 0);
+  const filtered = ITEMS.filter(i => i.label.toLowerCase().includes(query.toLowerCase()) && query.length > 0);
 
-return (
-<div className="page">
-<div className="hero-area">
-<div className="greeting">Good morning, Yaba 👋</div>
-<h1 className="hero-title">Find the <em>cheapest</em> prices near you</h1>
-<div className="search-bar">
-<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-<input
-placeholder=“Search item e.g. rice, eggs…”
-value={query}
-onChange={e => { setQuery(e.target.value); setShowSugg(true); }}
-onFocus={() => setShowSugg(true)}
-/>
-{query && <span style={{cursor:“pointer”,color:“var(–muted)”,fontSize:18}} onClick={() => { setQuery(””); setShowSugg(false); }}>×</span>}
-</div>
-{showSugg && filtered.length > 0 && (
-<div className="suggestions">
-{filtered.map(i => (
-<div key={i.id} className=“suggestion-item” onClick={() => { onSearch(i.id); setShowSugg(false); setQuery(””); }}>
-<span style={{fontSize:18}}>{i.icon}</span>{i.label}
-</div>
-))}
-</div>
-)}
-</div>
-
-```
-  <div className="section-label">Browse Category</div>
-  <div className="cats-row">
-    {ITEMS.map(i => (
-      <div key={i.id} className="cat-chip" onClick={() => onSearch(i.id)}>
-        <span>{i.icon}</span><p>{i.label.split(" ")[0]}</p>
+  return (
+    <div className="page">
+      <div className="hero-area">
+        <div className="greeting">Good morning, Yaba 👋</div>
+        <h1 className="hero-title">Find the <em>cheapest</em> prices near you</h1>
+        <div className="search-bar">
+          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input
+            placeholder="Search item e.g. rice, eggs..."
+            value={query}
+            onChange={e => { setQuery(e.target.value); setShowSugg(true); }}
+            onFocus={() => setShowSugg(true)}
+          />
+          {query && <span style={{cursor:"pointer",color:"var(--muted)",fontSize:18}} onClick={() => { setQuery(""); setShowSugg(false); }}>×</span>}
+        </div>
+        {showSugg && filtered.length > 0 && (
+          <div className="suggestions">
+            {filtered.map(i => (
+              <div key={i.id} className="suggestion-item" onClick={() => { onSearch(i.id); setShowSugg(false); setQuery(""); }}>
+                <span style={{fontSize:18}}>{i.icon}</span>{i.label}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    ))}
-  </div>
 
-  {!loading && cheapest.length > 0 && (
-    <div className="deals-banner">
-      <div className="deals-tag">⚡ Today's Cheapest</div>
-      <div className="deals-title">Best deals in Yaba right now</div>
-      <div className="deals-items">
-        {cheapest.slice(0,4).map((p,i) => {
-          const it = ITEMS.find(x => x.id === p.item);
-          return (
-            <div key={i} className="deal-pill">
-              <span className="price">₦{Number(p.price).toLocaleString()}</span>
-              <span className="item-name">{it ? it.label.split(" ")[0] : p.item}</span>
-            </div>
-          );
-        })}
+      <div className="section-label">Browse Category</div>
+      <div className="cats-row">
+        {ITEMS.map(i => (
+          <div key={i.id} className="cat-chip" onClick={() => onSearch(i.id)}>
+            <span>{i.icon}</span><p>{i.label.split(" ")[0]}</p>
+          </div>
+        ))}
       </div>
+
+      {!loading && cheapest.length > 0 && (
+        <div className="deals-banner">
+          <div className="deals-tag">⚡ Today's Cheapest</div>
+          <div className="deals-title">Best deals in Yaba right now</div>
+          <div className="deals-items">
+            {cheapest.slice(0,4).map((p,i) => {
+              const it = ITEMS.find(x => x.id === p.item);
+              return (
+                <div key={i} className="deal-pill">
+                  <span className="price">₦{Number(p.price).toLocaleString()}</span>
+                  <span className="item-name">{it ? it.label.split(" ")[0] : p.item}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="section-label">Recent Updates</div>
+      {loading ? <Spinner /> : recent.length === 0
+        ? <div className="empty-state"><div className="empty-icon">📭</div><p>No prices yet — be the first to report one!</p></div>
+        : recent.map((p, i) => <PriceCard key={p.id} item={p} topPick={i===0} />)
+      }
     </div>
-  )}
-
-  <div className="section-label">Recent Updates</div>
-  {loading ? <Spinner /> : recent.length === 0
-    ? <div className="empty-state"><div className="empty-icon">📭</div><p>No prices yet — be the first to report one!</p></div>
-    : recent.map((p, i) => <PriceCard key={p.id} item={p} topPick={i===0} />)
-  }
-</div>
-```
-
-);
+  );
 }
 
 // ── RESULTS PAGE ──────────────────────────────────────────────────────────────
 function ResultsPage({ itemId, userCoords }) {
-const [sort,    setSort]    = useState(“cheapest”);
-const [prices,  setPrices]  = useState([]);
-const [loading, setLoading] = useState(true);
-const [error,   setError]   = useState(null);
-const item = ITEMS.find(i => i.id === itemId) || ITEMS[0];
+  const [sort,    setSort]    = useState("cheapest");
+  const [prices,  setPrices]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const item = ITEMS.find(i => i.id === itemId) || ITEMS[0];
 
-useEffect(() => {
-async function load() {
-setLoading(true); setError(null);
-try {
-const data = await sb.select(“prices?select=*&item=eq.” + itemId + “&order=price.asc”);
-setPrices(data || []);
-} catch(e) { setError(e.message); }
-setLoading(false);
-}
-load();
-}, [itemId]);
+  useEffect(() => {
+    async function load() {
+      setLoading(true); setError(null);
+      try {
+        const data = await sb.select("prices?select=*&item=eq." + itemId + "&order=price.asc");
+        setPrices(data || []);
+      } catch(e) { setError(e.message); }
+      setLoading(false);
+    }
+    load();
+  }, [itemId]);
 
-const today = new Date().toISOString().split(“T”)[0];
+  const today = new Date().toISOString().split("T")[0];
 
-// Attach distances to prices — geocode unknown stores async
-const [pricesWithDist, setPricesWithDist] = useState([]);
-useEffect(() => {
-if (!prices.length) { setPricesWithDist([]); return; }
-async function attachDistances() {
-const result = await Promise.all(prices.map(async p => {
-if (!userCoords) return { …p, _dist: null };
-const coords = await geocodeStore(p.store, p.area);
-const dist = coords
-? getDistanceKm(userCoords.lat, userCoords.lng, coords.lat, coords.lng)
-: null;
-return { …p, _dist: dist };
-}));
-setPricesWithDist(result);
-}
-attachDistances();
-}, [prices, userCoords]);
+  // Attach distances to prices — geocode unknown stores async
+  const [pricesWithDist, setPricesWithDist] = useState([]);
+  useEffect(() => {
+    if (!prices.length) { setPricesWithDist([]); return; }
+    async function attachDistances() {
+      const result = await Promise.all(prices.map(async p => {
+        if (!userCoords) return { ...p, _dist: null };
+        const coords = await geocodeStore(p.store, p.area);
+        const dist = coords
+          ? getDistanceKm(userCoords.lat, userCoords.lng, coords.lat, coords.lng)
+          : null;
+        return { ...p, _dist: dist };
+      }));
+      setPricesWithDist(result);
+    }
+    attachDistances();
+  }, [prices, userCoords]);
 
-const sorted = […pricesWithDist]
-.filter(p => sort === “clearance” ? p.clearance === true : true)
-.sort((a, b) => {
-if (sort === “cheapest”)      return a.price - b.price;
-if (sort === “most reliable”) return b.confidence - a.confidence;
-if (sort === “closest”) {
-if (a._dist === null && b._dist === null) return a.price - b.price;
-if (a._dist === null) return 1;
-if (b._dist === null) return -1;
-return a._dist - b._dist;
-}
-if (sort === “clearance”) {
-if (!a.expiry_date && !b.expiry_date) return a.price - b.price;
-if (!a.expiry_date) return 1;
-if (!b.expiry_date) return -1;
-return new Date(a.expiry_date) - new Date(b.expiry_date);
-}
-return b.confidence - a.confidence;
-});
+  const sorted = [...pricesWithDist]
+    .filter(p => sort === "clearance" ? p.clearance === true : true)
+    .sort((a, b) => {
+      if (sort === "cheapest")      return a.price - b.price;
+      if (sort === "most reliable") return b.confidence - a.confidence;
+      if (sort === "closest") {
+        if (a._dist === null && b._dist === null) return a.price - b.price;
+        if (a._dist === null) return 1;
+        if (b._dist === null) return -1;
+        return a._dist - b._dist;
+      }
+      if (sort === "clearance") {
+        if (!a.expiry_date && !b.expiry_date) return a.price - b.price;
+        if (!a.expiry_date) return 1;
+        if (!b.expiry_date) return -1;
+        return new Date(a.expiry_date) - new Date(b.expiry_date);
+      }
+      return b.confidence - a.confidence;
+    });
 
-const clearanceCount = prices.filter(p => p.clearance).length;
-const avgNow  = prices.length ? Math.round(prices.reduce((s,p) => s + Number(p.price), 0) / prices.length) : 0;
-const minP    = prices.length ? Math.min(…prices.map(p => p.price)) : 0;
-const maxP    = prices.length ? Math.max(…prices.map(p => p.price)) : 0;
-const trending = maxP - minP > minP * 0.1 ? “up” : “stable”;
+  const clearanceCount = prices.filter(p => p.clearance).length;
+  const avgNow  = prices.length ? Math.round(prices.reduce((s,p) => s + Number(p.price), 0) / prices.length) : 0;
+  const minP    = prices.length ? Math.min(...prices.map(p => p.price)) : 0;
+  const maxP    = prices.length ? Math.max(...prices.map(p => p.price)) : 0;
+  const trending = maxP - minP > minP * 0.1 ? "up" : "stable";
 
-function daysUntilExpiry(dateStr) {
-if (!dateStr) return null;
-const diff = Math.ceil((new Date(dateStr) - new Date(today)) / 86400000);
-return diff;
-}
-
-return (
-<div className="page">
-<div style={{padding:“20px 20px 12px”}}>
-<div style={{fontSize:13,color:“var(–muted)”,marginBottom:6}}>Results for</div>
-<div style={{fontFamily:“var(–font-head)”,fontSize:22,fontWeight:800,display:“flex”,alignItems:“center”,gap:8}}>
-<span>{item.icon}</span> {item.label}
-</div>
-{!loading && <div style={{fontSize:12,color:“var(–muted)”,marginTop:4}}>{prices.length} reports · Avg ₦{avgNow.toLocaleString()}</div>}
-</div>
-
-```
-  {!loading && trending === "up" && prices.length > 1 && (
-    <div className="trend-banner trend-up">
-      <span style={{fontSize:18}}>📈</span>
-      <div className="trend-text"><b style={{color:"var(--red)"}}>Price Variation High</b><span>₦{minP.toLocaleString()} – ₦{maxP.toLocaleString()} across stores. Compare carefully.</span></div>
-    </div>
-  )}
-
-  {error && <div className="error-banner">⚠️ Could not load prices: {error}</div>}
-
-  <div className="sort-row">
-    {[
-      { id:"cheapest",      label:"💰 Cheapest" },
-      { id:"closest",       label:"📍 Closest" },
-      { id:"most reliable", label:"✅ Most Reliable" },
-      { id:"clearance",     label:"🏷️ Clearance" + (clearanceCount > 0 ? " (" + clearanceCount + ")" : "") },
-    ].map(s => (
-      <button key={s.id} className={"sort-btn " + (sort===s.id?"active":"")}
-        style={sort===s.id && s.id==="clearance" ? {background:"var(--orange)",borderColor:"var(--orange)"} : {}}
-        onClick={() => setSort(s.id)}>
-        {s.label}
-      </button>
-    ))}
-  </div>
-  {sort === "closest" && !userCoords && (
-    <div className="error-banner" style={{margin:"0 20px 12px"}}>
-      📍 Enable location to sort by distance
-    </div>
-  )}
-
-  {sort === "clearance" && !loading && (
-    <div className="trend-banner" style={{background:"rgba(255,107,43,0.08)",border:"1px solid rgba(255,107,43,0.2)"}}>
-      <span style={{fontSize:18}}>🏷️</span>
-      <div className="trend-text">
-        <b style={{color:"var(--orange)"}}>Clearance Deals</b>
-        <span>Items near expiry — deeply discounted. Buy today.</span>
-      </div>
-    </div>
-  )}
-
-  {loading ? <Spinner /> : sorted.length === 0
-    ? <div className="empty-state">
-        <div className="empty-icon">{sort==="clearance"?"🏷️":"🔍"}</div>
-        <p>{sort==="clearance" ? "No clearance items reported yet." : "No prices reported for " + item.label + " yet."}<br/>Be the first to add one!</p>
-      </div>
-    : sorted.map((p, i) => {
-        const days = daysUntilExpiry(p.expiry_date);
-        return <PriceCard key={p.id} item={p} topPick={i===0 && sort!=="clearance"}
-          clearance={p.clearance} daysLeft={days} distance={formatDist(p._dist)} />;
-      })
+  function daysUntilExpiry(dateStr) {
+    if (!dateStr) return null;
+    const diff = Math.ceil((new Date(dateStr) - new Date(today)) / 86400000);
+    return diff;
   }
-</div>
-```
 
-);
+  return (
+    <div className="page">
+      <div style={{padding:"20px 20px 12px"}}>
+        <div style={{fontSize:13,color:"var(--muted)",marginBottom:6}}>Results for</div>
+        <div style={{fontFamily:"var(--font-head)",fontSize:22,fontWeight:800,display:"flex",alignItems:"center",gap:8}}>
+          <span>{item.icon}</span> {item.label}
+        </div>
+        {!loading && <div style={{fontSize:12,color:"var(--muted)",marginTop:4}}>{prices.length} reports · Avg ₦{avgNow.toLocaleString()}</div>}
+      </div>
+
+      {!loading && trending === "up" && prices.length > 1 && (
+        <div className="trend-banner trend-up">
+          <span style={{fontSize:18}}>📈</span>
+          <div className="trend-text"><b style={{color:"var(--red)"}}>Price Variation High</b><span>₦{minP.toLocaleString()} – ₦{maxP.toLocaleString()} across stores. Compare carefully.</span></div>
+        </div>
+      )}
+
+      {error && <div className="error-banner">⚠️ Could not load prices: {error}</div>}
+
+      <div className="sort-row">
+        {[
+          { id:"cheapest",      label:"💰 Cheapest" },
+          { id:"closest",       label:"📍 Closest" },
+          { id:"most reliable", label:"✅ Most Reliable" },
+          { id:"clearance",     label:"🏷️ Clearance" + (clearanceCount > 0 ? " (" + clearanceCount + ")" : "") },
+        ].map(s => (
+          <button key={s.id} className={"sort-btn " + (sort===s.id?"active":"")}
+            style={sort===s.id && s.id==="clearance" ? {background:"var(--orange)",borderColor:"var(--orange)"} : {}}
+            onClick={() => setSort(s.id)}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {sort === "closest" && !userCoords && (
+        <div className="error-banner" style={{margin:"0 20px 12px"}}>
+          📍 Enable location to sort by distance
+        </div>
+      )}
+
+      {sort === "clearance" && !loading && (
+        <div className="trend-banner" style={{background:"rgba(255,107,43,0.08)",border:"1px solid rgba(255,107,43,0.2)"}}>
+          <span style={{fontSize:18}}>🏷️</span>
+          <div className="trend-text">
+            <b style={{color:"var(--orange)"}}>Clearance Deals</b>
+            <span>Items near expiry — deeply discounted. Buy today.</span>
+          </div>
+        </div>
+      )}
+
+      {loading ? <Spinner /> : sorted.length === 0
+        ? <div className="empty-state">
+            <div className="empty-icon">{sort==="clearance"?"🏷️":"🔍"}</div>
+            <p>{sort==="clearance" ? "No clearance items reported yet." : "No prices reported for " + item.label + " yet."}<br/>Be the first to add one!</p>
+          </div>
+        : sorted.map((p, i) => {
+            const days = daysUntilExpiry(p.expiry_date);
+            return <PriceCard key={p.id} item={p} topPick={i===0 && sort!=="clearance"}
+              clearance={p.clearance} daysLeft={days} distance={formatDist(p._dist)} />;
+          })
+      }
+    </div>
+  );
 }
 
 // ── ADD PAGE ──────────────────────────────────────────────────────────────────
 function AddPage({ onSubmit, user }) {
-const [item,         setItem]         = useState(””);
-const [price,        setPrice]        = useState(””);
-const [store,        setStore]        = useState(””);
-const [area,         setArea]         = useState(””);
-const [isClearance,  setIsClearance]  = useState(false);
-const [expiryDate,   setExpiryDate]   = useState(””);
-const [submitting,   setSubmitting]   = useState(false);
-const [error,        setError]        = useState(null);
+  const [item,         setItem]         = useState("");
+  const [price,        setPrice]        = useState("");
+  const [store,        setStore]        = useState("");
+  const [area,         setArea]         = useState("");
+  const [isClearance,  setIsClearance]  = useState(false);
+  const [expiryDate,   setExpiryDate]   = useState("");
+  const [submitting,   setSubmitting]   = useState(false);
+  const [error,        setError]        = useState(null);
 
-const valid = item && price && store && area && !submitting;
+  const valid = item && price && store && area && !submitting;
 
-async function handleSubmit() {
-if (!valid) return;
-setSubmitting(true); setError(null);
-try {
-const result = await sb.rpc(“upsert_price”, {
-p_item:        item,
-p_price:       Number(price),
-p_store:       store.trim(),
-p_area:        area.trim(),
-p_clearance:   isClearance,
-p_expiry_date: isClearance && expiryDate ? expiryDate : null,
-p_user_id:     user?.id || null,
-});
-// Award points to user profile
-if (user?.id) {
-const pts = result.action === “boosted” ? 10 : 25;
-sb.rpc(“award_points”, { p_user_id: user.id, p_points: pts }).catch(() => {});
-}
-setSubmitting(false);
-onSubmit(result.action === “boosted” ? “boosted” : “new”);
-} catch(e) { setError(e.message); setSubmitting(false); }
-}
+  async function handleSubmit() {
+    if (!valid) return;
+    setSubmitting(true); setError(null);
+    try {
+      const result = await sb.rpc("upsert_price", {
+        p_item:        item,
+        p_price:       Number(price),
+        p_store:       store.trim(),
+        p_area:        area.trim(),
+        p_clearance:   isClearance,
+        p_expiry_date: isClearance && expiryDate ? expiryDate : null,
+        p_user_id:     user?.id || null,
+      });
+      // Award points to user profile
+      if (user?.id) {
+        const pts = result.action === "boosted" ? 10 : 25;
+        sb.rpc("award_points", { p_user_id: user.id, p_points: pts }).catch(() => {});
+      }
+      setSubmitting(false);
+      onSubmit(result.action === "boosted" ? "boosted" : "new");
+    } catch(e) { setError(e.message); setSubmitting(false); }
+  }
 
-return (
-<div className="page">
-<div className="form-header">
-<div className="form-title">Report a Price 📸</div>
-<div className="form-subtitle">Help your community find the best deals</div>
-</div>
+  return (
+    <div className="page">
+      <div className="form-header">
+        <div className="form-title">Report a Price 📸</div>
+        <div className="form-subtitle">Help your community find the best deals</div>
+      </div>
 
-```
-  {error && <div className="error-banner" style={{margin:"0 20px 12px"}}>⚠️ {error}</div>}
+      {error && <div className="error-banner" style={{margin:"0 20px 12px"}}>⚠️ {error}</div>}
 
-  <div className="form-group">
-    <label className="form-label">Item</label>
-    <select className="form-select" value={item} onChange={e => setItem(e.target.value)}>
-      <option value="">Select item...</option>
-      {ITEMS.map(i => <option key={i.id} value={i.id}>{i.icon} {i.label}</option>)}
-    </select>
-  </div>
+      <div className="form-group">
+        <label className="form-label">Item</label>
+        <select className="form-select" value={item} onChange={e => setItem(e.target.value)}>
+          <option value="">Select item...</option>
+          {ITEMS.map(i => <option key={i.id} value={i.id}>{i.icon} {i.label}</option>)}
+        </select>
+      </div>
 
-  <div className="form-group">
-    <label className="form-label">Price (₦)</label>
-    <div className="price-input-wrap">
-      <span className="naira-sign">₦</span>
-      <input className="form-input" type="number" placeholder="0" value={price} onChange={e => setPrice(e.target.value)} />
-    </div>
-  </div>
-
-  <div className="form-group">
-    <label className="form-label">Store / Market Name</label>
-    <input className="form-input" placeholder="e.g. Mama Ngozi Provisions" value={store} onChange={e => setStore(e.target.value)} />
-  </div>
-
-  <div className="form-group">
-    <label className="form-label">Area</label>
-    <select className="form-select" value={area} onChange={e => setArea(e.target.value)}>
-      <option value="">Select area...</option>
-      <option>Yaba</option><option>Lekki</option><option>Ikeja</option>
-      <option>Surulere</option><option>Oshodi</option>
-    </select>
-  </div>
-
-  <div className="form-group">
-    <label className="form-label">Clearance Item?</label>
-    <div
-      onClick={() => setIsClearance(!isClearance)}
-      style={{
-        display:"flex", alignItems:"center", justifyContent:"space-between",
-        background:"var(--surface)", border:"1.5px solid " + (isClearance ? "var(--orange)" : "var(--border)"),
-        borderRadius:12, padding:"13px 16px", cursor:"pointer", transition:"border-color 0.2s"
-      }}>
-      <div>
-        <div style={{fontSize:13,fontWeight:600,color: isClearance ? "var(--orange)" : "var(--text)"}}>
-          🏷️ Mark as Clearance
+      <div className="form-group">
+        <label className="form-label">Price (₦)</label>
+        <div className="price-input-wrap">
+          <span className="naira-sign">₦</span>
+          <input className="form-input" type="number" placeholder="0" value={price} onChange={e => setPrice(e.target.value)} />
         </div>
-        <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>Item is near expiry and discounted</div>
       </div>
-      <div style={{
-        width:44, height:24, borderRadius:12, transition:"background 0.2s",
-        background: isClearance ? "var(--orange)" : "var(--border)",
-        position:"relative", flexShrink:0
-      }}>
-        <div style={{
-          position:"absolute", top:3,
-          left: isClearance ? 22 : 3,
-          width:18, height:18, borderRadius:"50%",
-          background:"#fff", transition:"left 0.2s"
-        }}/>
+
+      <div className="form-group">
+        <label className="form-label">Store / Market Name</label>
+        <input className="form-input" placeholder="e.g. Mama Ngozi Provisions" value={store} onChange={e => setStore(e.target.value)} />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Area</label>
+        <select className="form-select" value={area} onChange={e => setArea(e.target.value)}>
+          <option value="">Select area...</option>
+          <option>Yaba</option><option>Lekki</option><option>Ikeja</option>
+          <option>Surulere</option><option>Oshodi</option>
+        </select>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Clearance Item?</label>
+        <div
+          onClick={() => setIsClearance(!isClearance)}
+          style={{
+            display:"flex", alignItems:"center", justifyContent:"space-between",
+            background:"var(--surface)", border:"1.5px solid " + (isClearance ? "var(--orange)" : "var(--border)"),
+            borderRadius:12, padding:"13px 16px", cursor:"pointer", transition:"border-color 0.2s"
+          }}>
+          <div>
+            <div style={{fontSize:13,fontWeight:600,color: isClearance ? "var(--orange)" : "var(--text)"}}>
+              🏷️ Mark as Clearance
+            </div>
+            <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>Item is near expiry and discounted</div>
+          </div>
+          <div style={{
+            width:44, height:24, borderRadius:12, transition:"background 0.2s",
+            background: isClearance ? "var(--orange)" : "var(--border)",
+            position:"relative", flexShrink:0
+          }}>
+            <div style={{
+              position:"absolute", top:3,
+              left: isClearance ? 22 : 3,
+              width:18, height:18, borderRadius:"50%",
+              background:"#fff", transition:"left 0.2s"
+            }}/>
+          </div>
+        </div>
+      </div>
+
+      {isClearance && (
+        <div className="form-group">
+          <label className="form-label">Expiry Date</label>
+          <input
+            className="form-input"
+            type="date"
+            value={expiryDate}
+            onChange={e => setExpiryDate(e.target.value)}
+            style={{colorScheme:"dark"}}
+          />
+        </div>
+      )}
+
+      <div className="form-group">
+        <label className="form-label">Photo (Optional)</label>
+        <div className="photo-upload">
+          <div style={{fontSize:28}}>📷</div>
+          <p>Tap to add a receipt or price photo</p>
+          <p style={{fontSize:11,marginTop:4}}>+10 bonus points with photo</p>
+        </div>
+      </div>
+
+      <button className="submit-btn" onClick={handleSubmit} disabled={!valid}>
+        {submitting ? "Submitting..." : "Submit Price Report →"}
+      </button>
+      <div className="points-preview">
+        <span>🏅</span><span>You'll earn <b>+25 points</b> for this submission</span>
       </div>
     </div>
-  </div>
-
-  {isClearance && (
-    <div className="form-group">
-      <label className="form-label">Expiry Date</label>
-      <input
-        className="form-input"
-        type="date"
-        value={expiryDate}
-        onChange={e => setExpiryDate(e.target.value)}
-        style={{colorScheme:"dark"}}
-      />
-    </div>
-  )}
-
-  <div className="form-group">
-    <label className="form-label">Photo (Optional)</label>
-    <div className="photo-upload">
-      <div style={{fontSize:28}}>📷</div>
-      <p>Tap to add a receipt or price photo</p>
-      <p style={{fontSize:11,marginTop:4}}>+10 bonus points with photo</p>
-    </div>
-  </div>
-
-  <button className="submit-btn" onClick={handleSubmit} disabled={!valid}>
-    {submitting ? "Submitting..." : "Submit Price Report →"}
-  </button>
-  <div className="points-preview">
-    <span>🏅</span><span>You'll earn <b>+25 points</b> for this submission</span>
-  </div>
-</div>
-```
-
-);
+  );
 }
 
 // ── INSIGHTS PAGE ─────────────────────────────────────────────────────────────
 function InsightsPage() {
-const [area,       setArea]       = useState(“Yaba”);
-const [activeItem, setActiveItem] = useState(“rice”);
-const [chartData,  setChartData]  = useState([]);
-const [savings,    setSavings]    = useState(0);
-const [loading,    setLoading]    = useState(true);
-const item = ITEMS.find(i => i.id === activeItem);
+  const [area,       setArea]       = useState("Yaba");
+  const [activeItem, setActiveItem] = useState("rice");
+  const [chartData,  setChartData]  = useState([]);
+  const [savings,    setSavings]    = useState(0);
+  const [loading,    setLoading]    = useState(true);
+  const item = ITEMS.find(i => i.id === activeItem);
 
-useEffect(() => {
-async function load() {
-setLoading(true);
-try {
-const data = await sb.select(`prices?select=price,timestamp&item=eq.${activeItem}&area=eq.${area}&order=timestamp.asc&limit=50`);
-if (data && data.length > 0) {
-const prices = data.map(d => Number(d.price));
-const chunk = Math.ceil(prices.length / 7);
-const buckets = [];
-for (let i = 0; i < 7; i++) {
-const slice = prices.slice(i * chunk, (i + 1) * chunk);
-buckets.push(slice.length ? Math.round(slice.reduce((a,b) => a+b,0)/slice.length) : (buckets[buckets.length-1] || prices[0]));
-}
-setChartData(buckets);
-setSavings(Math.max(…prices) - Math.min(…prices));
-} else { setChartData([]); setSavings(0); }
-} catch(e) { setChartData([]); setSavings(0); }
-setLoading(false);
-}
-load();
-}, [activeItem, area]);
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const data = await sb.select(`prices?select=price,timestamp&item=eq.${activeItem}&area=eq.${area}&order=timestamp.asc&limit=50`);
+        if (data && data.length > 0) {
+          const prices = data.map(d => Number(d.price));
+          const chunk = Math.ceil(prices.length / 7);
+          const buckets = [];
+          for (let i = 0; i < 7; i++) {
+            const slice = prices.slice(i * chunk, (i + 1) * chunk);
+            buckets.push(slice.length ? Math.round(slice.reduce((a,b) => a+b,0)/slice.length) : (buckets[buckets.length-1] || prices[0]));
+          }
+          setChartData(buckets);
+          setSavings(Math.max(...prices) - Math.min(...prices));
+        } else { setChartData([]); setSavings(0); }
+      } catch(e) { setChartData([]); setSavings(0); }
+      setLoading(false);
+    }
+    load();
+  }, [activeItem, area]);
 
-const diff = chartData.length > 1 ? chartData[chartData.length-1] - chartData[0] : 0;
-const pct  = chartData[0] ? Math.abs(Math.round((diff / chartData[0]) * 100)) : 0;
+  const diff = chartData.length > 1 ? chartData[chartData.length-1] - chartData[0] : 0;
+  const pct  = chartData[0] ? Math.abs(Math.round((diff / chartData[0]) * 100)) : 0;
 
-return (
-<div className="page">
-<div className="insights-hero">
-<div className="insights-title">Price Insights 📊</div>
-<div className="area-tabs">
-{[“Yaba”,“Lekki”,“Ikeja”].map(a => (
-<div key={a} className={`area-tab ${area===a?"active":""}`} onClick={() => setArea(a)}>{a}</div>
-))}
-</div>
-</div>
-
-```
-  <div className="savings-card">
-    <div className="savings-label">💡 Potential Savings</div>
-    <div className="savings-amount">{savings > 0 ? `₦${savings.toLocaleString()}` : "—"}</div>
-    <div className="savings-desc">between cheapest and most expensive {activeItem} in {area}</div>
-  </div>
-
-  <div className="section-label">Price Trend by Item</div>
-  <div className="cats-row" style={{marginBottom:12}}>
-    {ITEMS.slice(0,4).map(i => (
-      <div key={i.id} className={`cat-chip ${activeItem===i.id?"active":""}`} onClick={() => setActiveItem(i.id)}>
-        <span>{i.icon}</span><p>{i.label.split(" ")[0]}</p>
-      </div>
-    ))}
-  </div>
-
-  {loading ? <Spinner /> : chartData.length === 0
-    ? <div className="empty-state"><div className="empty-icon">📊</div><p>No data yet for {item?.label} in {area}</p></div>
-    : (
-      <div className="chart-card">
-        <div className="chart-title">{item?.icon} {item?.label} — {area}</div>
-        <div className="chart-sub">{pct > 0 ? (diff > 0 ? `↑ Up ${pct}% across reports` : `↓ Down ${pct}% across reports`) : "Stable prices"} · Latest: ₦{chartData[chartData.length-1]?.toLocaleString()}</div>
-        <MiniBarChart data={chartData} color={diff > 0 ? "#FF3B3B" : "#00C48C"} />
-        <div className="chart-legend">
-          <div className="legend-item"><div className="legend-dot" style={{background: diff>0?"#FF3B3B":"#00C48C"}} /><span>Latest</span></div>
-          <div className="legend-item"><div className="legend-dot" style={{background:"rgba(255,255,255,0.06)"}} /><span>Earlier</span></div>
+  return (
+    <div className="page">
+      <div className="insights-hero">
+        <div className="insights-title">Price Insights 📊</div>
+        <div className="area-tabs">
+          {["Yaba","Lekki","Ikeja"].map(a => (
+            <div key={a} className={`area-tab ${area===a?"active":""}`} onClick={() => setArea(a)}>{a}</div>
+          ))}
         </div>
       </div>
-    )
-  }
-</div>
-```
 
-);
+      <div className="savings-card">
+        <div className="savings-label">💡 Potential Savings</div>
+        <div className="savings-amount">{savings > 0 ? `₦${savings.toLocaleString()}` : "—"}</div>
+        <div className="savings-desc">between cheapest and most expensive {activeItem} in {area}</div>
+      </div>
+
+      <div className="section-label">Price Trend by Item</div>
+      <div className="cats-row" style={{marginBottom:12}}>
+        {ITEMS.slice(0,4).map(i => (
+          <div key={i.id} className={`cat-chip ${activeItem===i.id?"active":""}`} onClick={() => setActiveItem(i.id)}>
+            <span>{i.icon}</span><p>{i.label.split(" ")[0]}</p>
+          </div>
+        ))}
+      </div>
+
+      {loading ? <Spinner /> : chartData.length === 0
+        ? <div className="empty-state"><div className="empty-icon">📊</div><p>No data yet for {item?.label} in {area}</p></div>
+        : (
+          <div className="chart-card">
+            <div className="chart-title">{item?.icon} {item?.label} — {area}</div>
+            <div className="chart-sub">{pct > 0 ? (diff > 0 ? `↑ Up ${pct}% across reports` : `↓ Down ${pct}% across reports`) : "Stable prices"} · Latest: ₦{chartData[chartData.length-1]?.toLocaleString()}</div>
+            <MiniBarChart data={chartData} color={diff > 0 ? "#FF3B3B" : "#00C48C"} />
+            <div className="chart-legend">
+              <div className="legend-item"><div className="legend-dot" style={{background: diff>0?"#FF3B3B":"#00C48C"}} /><span>Latest</span></div>
+              <div className="legend-item"><div className="legend-dot" style={{background:"rgba(255,255,255,0.06)"}} /><span>Earlier</span></div>
+            </div>
+          </div>
+        )
+      }
+    </div>
+  );
 }
 
 // ── AUTH PAGE ─────────────────────────────────────────────────────────────────
 function AuthPage({ onAuth }) {
-const [mode,       setMode]       = useState(“login”);
-const [name,       setName]       = useState(””);
-const [email,      setEmail]      = useState(””);
-const [password,   setPassword]   = useState(””);
-const [loading,    setLoading]    = useState(false);
-const [error,      setError]      = useState(null);
+  const [mode,       setMode]       = useState("login");
+  const [name,       setName]       = useState("");
+  const [email,      setEmail]      = useState("");
+  const [password,   setPassword]   = useState("");
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState(null);
 
-async function handle() {
-if (!email || !password) return;
-if (mode === “signup” && !name) return;
-setLoading(true); setError(null);
-try {
-if (mode === “signup”) {
-await sb.signUp(email, password, name);
-} else {
-await sb.signIn(email, password);
-}
-onAuth(sb.getUser());
-} catch(e) { setError(e.message); }
-setLoading(false);
-}
+  async function handle() {
+    if (!email || !password) return;
+    if (mode === "signup" && !name) return;
+    setLoading(true); setError(null);
+    try {
+      if (mode === "signup") {
+        await sb.signUp(email, password, name);
+      } else {
+        await sb.signIn(email, password);
+      }
+      onAuth(sb.getUser());
+    } catch(e) { setError(e.message); }
+    setLoading(false);
+  }
 
-return (
-<div className="auth-page">
-<div className="auth-logo">Price<span>Pulse</span></div>
-<div className="auth-tagline">Find the cheapest prices in Lagos</div>
-<div className="auth-card">
-<div className="auth-tabs">
-<button className={“auth-tab “ + (mode===“login”?“active”:””)} onClick={() => { setMode(“login”); setError(null); }}>Log In</button>
-<button className={“auth-tab “ + (mode===“signup”?“active”:””)} onClick={() => { setMode(“signup”); setError(null); }}>Sign Up</button>
-</div>
+  return (
+    <div className="auth-page">
+      <div className="auth-logo">Price<span>Pulse</span></div>
+      <div className="auth-tagline">Find the cheapest prices in Lagos</div>
+      <div className="auth-card">
+        <div className="auth-tabs">
+          <button className={"auth-tab " + (mode==="login"?"active":"")} onClick={() => { setMode("login"); setError(null); }}>Log In</button>
+          <button className={"auth-tab " + (mode==="signup"?"active":"")} onClick={() => { setMode("signup"); setError(null); }}>Sign Up</button>
+        </div>
 
-```
-    {error && <div className="auth-error">⚠️ {error}</div>}
+        {error && <div className="auth-error">⚠️ {error}</div>}
 
-    {mode === "signup" && (
-      <div className="auth-field">
-        <input className="auth-input" placeholder="Your name" value={name}
-          onChange={e => setName(e.target.value)} />
+        {mode === "signup" && (
+          <div className="auth-field">
+            <input className="auth-input" placeholder="Your name" value={name}
+              onChange={e => setName(e.target.value)} />
+          </div>
+        )}
+        <div className="auth-field">
+          <input className="auth-input" type="email" placeholder="Email address" value={email}
+            onChange={e => setEmail(e.target.value)} />
+        </div>
+        <div className="auth-field">
+          <input className="auth-input" type="password" placeholder="Password" value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handle()} />
+        </div>
+
+        <button className="auth-btn" onClick={handle} disabled={loading}>
+          {loading ? "Please wait..." : mode === "signup" ? "Create Account →" : "Log In →"}
+        </button>
       </div>
-    )}
-    <div className="auth-field">
-      <input className="auth-input" type="email" placeholder="Email address" value={email}
-        onChange={e => setEmail(e.target.value)} />
+      <div className="auth-footer">
+        By signing up you help Lagos find better prices 🌍
+      </div>
     </div>
-    <div className="auth-field">
-      <input className="auth-input" type="password" placeholder="Password" value={password}
-        onChange={e => setPassword(e.target.value)}
-        onKeyDown={e => e.key === "Enter" && handle()} />
-    </div>
-
-    <button className="auth-btn" onClick={handle} disabled={loading}>
-      {loading ? "Please wait..." : mode === "signup" ? "Create Account →" : "Log In →"}
-    </button>
-  </div>
-  <div className="auth-footer">
-    By signing up you help Lagos find better prices 🌍
-  </div>
-</div>
-```
-
-);
+  );
 }
 
 // ── PROFILE PAGE ──────────────────────────────────────────────────────────────
 function ProfilePage({ user, onSignOut }) {
-const [profile,     setProfile]     = useState(null);
-const [mySubmits,   setMySubmits]   = useState(”—”);
-const [totalPrices, setTotalPrices] = useState(”—”);
-const [avgConf,     setAvgConf]     = useState(”—”);
+  const [profile,     setProfile]     = useState(null);
+  const [mySubmits,   setMySubmits]   = useState("—");
+  const [totalPrices, setTotalPrices] = useState("—");
+  const [avgConf,     setAvgConf]     = useState("—");
 
-useEffect(() => {
-if (!user) return;
-// Load profile from DB
-sb.select(“profiles?id=eq.” + user.id).then(data => {
-if (data && data.length > 0) setProfile(data[0]);
-}).catch(() => {});
-// My submissions
-sb.select(“prices?select=id&user_id=eq.” + user.id).then(data => {
-if (data) setMySubmits(data.length);
-}).catch(() => {});
-// Total prices
-sb.count(“prices”).then(c => setTotalPrices(c));
-// Avg confidence
-sb.select(“prices?select=confidence”).then(data => {
-if (data && data.length > 0) {
-const avg = Math.round(data.reduce((s,p) => s + Number(p.confidence), 0) / data.length);
-setAvgConf(avg + “%”);
-}
-}).catch(() => {});
-}, [user]);
+  useEffect(() => {
+    if (!user) return;
+    // Load profile from DB
+    sb.select("profiles?id=eq." + user.id).then(data => {
+      if (data && data.length > 0) setProfile(data[0]);
+    }).catch(() => {});
+    // My submissions
+    sb.select("prices?select=id&user_id=eq." + user.id).then(data => {
+      if (data) setMySubmits(data.length);
+    }).catch(() => {});
+    // Total prices
+    sb.count("prices").then(c => setTotalPrices(c));
+    // Avg confidence
+    sb.select("prices?select=confidence").then(data => {
+      if (data && data.length > 0) {
+        const avg = Math.round(data.reduce((s,p) => s + Number(p.confidence), 0) / data.length);
+        setAvgConf(avg + "%");
+      }
+    }).catch(() => {});
+  }, [user]);
 
-if (!user) return null;
+  if (!user) return null;
 
-const displayName = profile?.name || user.name || user.email?.split(”@”)[0] || “User”;
-const points      = profile?.points || 0;
-const initials    = displayName.split(” “).map(w => w[0]).join(””).toUpperCase().slice(0,2);
-const rank        = points >= 500 ? “🥇 Gold Reporter” : points >= 200 ? “🥈 Silver Reporter” : points >= 50 ? “🥉 Bronze Reporter” : “🌱 Newcomer”;
-const nextRank    = points >= 500 ? 1000 : points >= 200 ? 500 : points >= 50 ? 200 : 50;
-const xpPct       = Math.min(100, Math.round((points / nextRank) * 100));
+  const displayName = profile?.name || user.name || user.email?.split("@")[0] || "User";
+  const points      = profile?.points || 0;
+  const initials    = displayName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
+  const rank        = points >= 500 ? "🥇 Gold Reporter" : points >= 200 ? "🥈 Silver Reporter" : points >= 50 ? "🥉 Bronze Reporter" : "🌱 Newcomer";
+  const nextRank    = points >= 500 ? 1000 : points >= 200 ? 500 : points >= 50 ? 200 : 50;
+  const xpPct       = Math.min(100, Math.round((points / nextRank) * 100));
 
-const badges = [
-{ icon:“🏆”, name:“Top Reporter”, earned: mySubmits >= 10  },
-{ icon:“🔥”, name:“First Report”, earned: mySubmits >= 1   },
-{ icon:“⚡”, name:“Fast Finder”,  earned: mySubmits >= 5   },
-{ icon:“🌍”, name:“Explorer”,     earned: mySubmits >= 20  },
-{ icon:“💎”, name:“Diamond”,      earned: points  >= 1000  },
-];
+  const badges = [
+    { icon:"🏆", name:"Top Reporter", earned: mySubmits >= 10  },
+    { icon:"🔥", name:"First Report", earned: mySubmits >= 1   },
+    { icon:"⚡", name:"Fast Finder",  earned: mySubmits >= 5   },
+    { icon:"🌍", name:"Explorer",     earned: mySubmits >= 20  },
+    { icon:"💎", name:"Diamond",      earned: points  >= 1000  },
+  ];
 
-return (
-<div className="page">
-<div className="profile-hero">
-<div className="avatar">{initials}</div>
-<div className="profile-name">{displayName}</div>
-<div className="profile-rank">{rank} · {profile?.area || “Yaba”}</div>
-</div>
-<div className="rank-card">
-<div className="rank-row">
-<span className="rank-label">Total Points</span>
-<span className=“rank-val” style={{color:“var(–yellow)”}}>{points} pts</span>
-</div>
-<div className="rank-row">
-<span className="rank-label">My Submissions</span>
-<span className="rank-val">{mySubmits}</span>
-</div>
-<div className="xp-bar"><div className=“xp-fill” style={{width: xpPct + “%”}} /></div>
-<div className="xp-note">{nextRank - points} pts to next rank</div>
-</div>
-<div className="stats-grid">
-<div className="stat-box"><div className=“stat-val” style={{color:“var(–green)”}}>{mySubmits}</div><div className="stat-lbl">My Reports</div></div>
-<div className="stat-box"><div className=“stat-val” style={{color:“var(–orange)”}}>{totalPrices}</div><div className="stat-lbl">Total in DB</div></div>
-<div className="stat-box"><div className=“stat-val” style={{color:“var(–yellow)”}}>{points}</div><div className="stat-lbl">My Points</div></div>
-<div className="stat-box"><div className=“stat-val” style={{color:“var(–text)”}}>{avgConf}</div><div className="stat-lbl">Avg Confidence</div></div>
-</div>
-<div className="section-label">Badges</div>
-<div className="badge-row">
-{badges.map((b, i) => (
-<div key={i} className={“badge “ + (b.earned?“earned”:””)}>
-<span className="badge-icon">{b.icon}</span>
-<span className="badge-name">{b.name}</span>
-</div>
-))}
-</div>
-<div style={{padding:“0 20px 20px”}}>
-<button onClick={onSignOut} style={{
-width:“100%”, background:“transparent”, border:“1px solid var(–border)”,
-borderRadius:12, padding:“12px”, color:“var(–muted)”, fontSize:13,
-cursor:“pointer”, fontFamily:“var(–font-body)”, marginTop:8
-}}>Sign Out</button>
-</div>
-</div>
-);
+  return (
+    <div className="page">
+      <div className="profile-hero">
+        <div className="avatar">{initials}</div>
+        <div className="profile-name">{displayName}</div>
+        <div className="profile-rank">{rank} · {profile?.area || "Yaba"}</div>
+      </div>
+      <div className="rank-card">
+        <div className="rank-row">
+          <span className="rank-label">Total Points</span>
+          <span className="rank-val" style={{color:"var(--yellow)"}}>{points} pts</span>
+        </div>
+        <div className="rank-row">
+          <span className="rank-label">My Submissions</span>
+          <span className="rank-val">{mySubmits}</span>
+        </div>
+        <div className="xp-bar"><div className="xp-fill" style={{width: xpPct + "%"}} /></div>
+        <div className="xp-note">{nextRank - points} pts to next rank</div>
+      </div>
+      <div className="stats-grid">
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--green)"}}>{mySubmits}</div><div className="stat-lbl">My Reports</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--orange)"}}>{totalPrices}</div><div className="stat-lbl">Total in DB</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--yellow)"}}>{points}</div><div className="stat-lbl">My Points</div></div>
+        <div className="stat-box"><div className="stat-val" style={{color:"var(--text)"}}>{avgConf}</div><div className="stat-lbl">Avg Confidence</div></div>
+      </div>
+      <div className="section-label">Badges</div>
+      <div className="badge-row">
+        {badges.map((b, i) => (
+          <div key={i} className={"badge " + (b.earned?"earned":"")}>
+            <span className="badge-icon">{b.icon}</span>
+            <span className="badge-name">{b.name}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{padding:"0 20px 20px"}}>
+        <button onClick={onSignOut} style={{
+          width:"100%", background:"transparent", border:"1px solid var(--border)",
+          borderRadius:12, padding:"12px", color:"var(--muted)", fontSize:13,
+          cursor:"pointer", fontFamily:"var(--font-body)", marginTop:8
+        }}>Sign Out</button>
+      </div>
+    </div>
+  );
 }
 
 // ── APP SHELL ─────────────────────────────────────────────────────────────────
 // ── DISTANCE HELPER ──────────────────────────────────────────────────────────
 // Verified GPS coordinates for known Lagos stores
 const STORE_COORDS = {
-“tejuosho market complex”:    { lat: 6.5060, lng: 3.3760 },
-“balogun market stall 12”:    { lat: 6.4551, lng: 3.3841 },
-“mama ngozi provisions”:      { lat: 6.5175, lng: 3.3712 },
-“freedom way supermart”:      { lat: 6.4478, lng: 3.4723 },
-“shoprite yaba”:              { lat: 6.5031, lng: 3.3794 },
-“spar express yaba”:          { lat: 6.5021, lng: 3.3810 },
-“alade market”:               { lat: 6.5507, lng: 3.3551 },
-“uncle emeka store”:          { lat: 6.5180, lng: 3.3720 },
-“ebeano supermarket”:         { lat: 6.4344, lng: 3.4201 },
-“bakers house yaba”:          { lat: 6.5042, lng: 3.3788 },
-“lekki market”:               { lat: 6.4350, lng: 3.4716 },
-“sangotedo supermart”:        { lat: 6.4344, lng: 3.5614 },
-“jakande market”:             { lat: 6.4668, lng: 3.5369 },
-“ikeja city mall”:            { lat: 6.6018, lng: 3.3515 },
-“ojota market”:               { lat: 6.5833, lng: 3.3833 },
-“allen avenue stores”:        { lat: 6.6097, lng: 3.3490 },
+  "tejuosho market complex":    { lat: 6.5060, lng: 3.3760 },
+  "balogun market stall 12":    { lat: 6.4551, lng: 3.3841 },
+  "mama ngozi provisions":      { lat: 6.5175, lng: 3.3712 },
+  "freedom way supermart":      { lat: 6.4478, lng: 3.4723 },
+  "shoprite yaba":              { lat: 6.5031, lng: 3.3794 },
+  "spar express yaba":          { lat: 6.5021, lng: 3.3810 },
+  "alade market":               { lat: 6.5507, lng: 3.3551 },
+  "uncle emeka store":          { lat: 6.5180, lng: 3.3720 },
+  "ebeano supermarket":         { lat: 6.4344, lng: 3.4201 },
+  "bakers house yaba":          { lat: 6.5042, lng: 3.3788 },
+  "lekki market":               { lat: 6.4350, lng: 3.4716 },
+  "sangotedo supermart":        { lat: 6.4344, lng: 3.5614 },
+  "jakande market":             { lat: 6.4668, lng: 3.5369 },
+  "ikeja city mall":            { lat: 6.6018, lng: 3.3515 },
+  "ojota market":               { lat: 6.5833, lng: 3.3833 },
+  "allen avenue stores":        { lat: 6.6097, lng: 3.3490 },
 };
 
 // Geocode cache — stores real coords for any store we look up
 const _geocodeCache = {};
 
 async function geocodeStore(storeName, area) {
-const key = storeName.toLowerCase();
-if (STORE_COORDS[key]) return STORE_COORDS[key];
-if (_geocodeCache[key]) return _geocodeCache[key];
-try {
-const query = encodeURIComponent(storeName + “, “ + (area || “Lagos”) + “, Nigeria”);
-const res = await fetch(
-“https://nominatim.openstreetmap.org/search?q=” + query + “&format=json&limit=1&countrycodes=ng”,
-{ headers: { “Accept-Language”: “en” } }
-);
-const data = await res.json();
-if (data && data[0]) {
-const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-_geocodeCache[key] = coords;
-return coords;
-}
-} catch(e) {}
-return null;
+  const key = storeName.toLowerCase();
+  if (STORE_COORDS[key]) return STORE_COORDS[key];
+  if (_geocodeCache[key]) return _geocodeCache[key];
+  try {
+    const query = encodeURIComponent(storeName + ", " + (area || "Lagos") + ", Nigeria");
+    const res = await fetch(
+      "https://nominatim.openstreetmap.org/search?q=" + query + "&format=json&limit=1&countrycodes=ng",
+      { headers: { "Accept-Language": "en" } }
+    );
+    const data = await res.json();
+    if (data && data[0]) {
+      const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      _geocodeCache[key] = coords;
+      return coords;
+    }
+  } catch(e) {}
+  return null;
 }
 
 function getDistanceKm(lat1, lon1, lat2, lon2) {
-const R = 6371;
-const dLat = (lat2 - lat1) * Math.PI / 180;
-const dLon = (lon2 - lon1) * Math.PI / 180;
-const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
-Math.sin(dLon/2) * Math.sin(dLon/2);
-return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 function formatDist(km) {
-if (km === null || km === undefined) return null;
-return km < 1 ? Math.round(km * 1000) + “m” : km.toFixed(1) + “km”;
+  if (km === null || km === undefined) return null;
+  return km < 1 ? Math.round(km * 1000) + "m" : km.toFixed(1) + "km";
 }
 
 // ── LOCATION MODAL ───────────────────────────────────────────────────────────
 function LocationModal({ current, onSave, onClose }) {
-const [manual,    setManual]    = useState(””);
-const [locating,  setLocating]  = useState(false);
-const [geocoding, setGeocoding] = useState(false);
-const [suggestions, setSuggestions] = useState([]);
+  const [manual,    setManual]    = useState("");
+  const [locating,  setLocating]  = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
 
-const AREA_COORDS = {
-“Yaba”:     { lat: 6.5158, lng: 3.3679 },
-“Lekki”:    { lat: 6.4350, lng: 3.4716 },
-“Ikeja”:    { lat: 6.6018, lng: 3.3515 },
-“Surulere”: { lat: 6.4969, lng: 3.3528 },
-“Oshodi”:   { lat: 6.5567, lng: 3.3481 },
-“VI”:       { lat: 6.4281, lng: 3.4219 },
-“Ajah”:     { lat: 6.4694, lng: 3.5814 },
-“Ikorodu”:  { lat: 6.6194, lng: 3.5106 },
-“Mafoluku”: { lat: 6.5456, lng: 3.3347 },
-“Mushin”:   { lat: 6.5333, lng: 3.3500 },
-“Ketu”:     { lat: 6.5833, lng: 3.3944 },
-“Maryland”: { lat: 6.5667, lng: 3.3667 },
-“Gbagada”:  { lat: 6.5500, lng: 3.3833 },
-“Festac”:   { lat: 6.4667, lng: 3.2833 },
-“Agege”:    { lat: 6.6167, lng: 3.3167 },
-“Ojodu”:    { lat: 6.6333, lng: 3.3667 },
-“Magodo”:   { lat: 6.6167, lng: 3.3833 },
-“Ogudu”:    { lat: 6.5833, lng: 3.3833 },
-};
+  const AREA_COORDS = {
+    "Yaba":     { lat: 6.5158, lng: 3.3679 },
+    "Lekki":    { lat: 6.4350, lng: 3.4716 },
+    "Ikeja":    { lat: 6.6018, lng: 3.3515 },
+    "Surulere": { lat: 6.4969, lng: 3.3528 },
+    "Oshodi":   { lat: 6.5567, lng: 3.3481 },
+    "VI":       { lat: 6.4281, lng: 3.4219 },
+    "Ajah":     { lat: 6.4694, lng: 3.5814 },
+    "Ikorodu":  { lat: 6.6194, lng: 3.5106 },
+    "Mafoluku": { lat: 6.5456, lng: 3.3347 },
+    "Mushin":   { lat: 6.5333, lng: 3.3500 },
+    "Ketu":     { lat: 6.5833, lng: 3.3944 },
+    "Maryland": { lat: 6.5667, lng: 3.3667 },
+    "Gbagada":  { lat: 6.5500, lng: 3.3833 },
+    "Festac":   { lat: 6.4667, lng: 3.2833 },
+    "Agege":    { lat: 6.6167, lng: 3.3167 },
+    "Ojodu":    { lat: 6.6333, lng: 3.3667 },
+    "Magodo":   { lat: 6.6167, lng: 3.3833 },
+    "Ogudu":    { lat: 6.5833, lng: 3.3833 },
+  };
 
-// Geocode any typed location via Nominatim
-async function geocodeLocation(name) {
-setGeocoding(true);
-try {
-const query = encodeURIComponent(name + “, Lagos, Nigeria”);
-const res = await fetch(
-“https://nominatim.openstreetmap.org/search?q=” + query +
-“&format=json&limit=4&countrycodes=ng”,
-{ headers: { “Accept-Language”: “en” } }
-);
-const results = await res.json();
-if (results && results.length > 0) {
-setSuggestions(results.map(r => ({
-name: r.display_name.split(”,”)[0],
-fullName: r.display_name,
-coords: { lat: parseFloat(r.lat), lng: parseFloat(r.lon) }
-})));
-} else {
-// Fallback — check our hardcoded list case-insensitively
-const key = Object.keys(AREA_COORDS).find(k => k.toLowerCase() === name.toLowerCase());
-if (key) onSave(key, AREA_COORDS[key]);
-else onSave(name, null);
-}
-} catch(e) {
-onSave(name, null);
-}
-setGeocoding(false);
-}
+  // Geocode any typed location via Nominatim
+  async function geocodeLocation(name) {
+    setGeocoding(true);
+    try {
+      const query = encodeURIComponent(name + ", Lagos, Nigeria");
+      const res = await fetch(
+        "https://nominatim.openstreetmap.org/search?q=" + query +
+        "&format=json&limit=4&countrycodes=ng",
+        { headers: { "Accept-Language": "en" } }
+      );
+      const results = await res.json();
+      if (results && results.length > 0) {
+        setSuggestions(results.map(r => ({
+          name: r.display_name.split(",")[0],
+          fullName: r.display_name,
+          coords: { lat: parseFloat(r.lat), lng: parseFloat(r.lon) }
+        })));
+      } else {
+        // Fallback — check our hardcoded list case-insensitively
+        const key = Object.keys(AREA_COORDS).find(k => k.toLowerCase() === name.toLowerCase());
+        if (key) onSave(key, AREA_COORDS[key]);
+        else onSave(name, null);
+      }
+    } catch(e) {
+      onSave(name, null);
+    }
+    setGeocoding(false);
+  }
 
-function useMyLocation() {
-setLocating(true);
-navigator.geolocation.getCurrentPosition(
-pos => {
-const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-fetch(
-“https://nominatim.openstreetmap.org/reverse?lat=” + coords.lat +
-“&lon=” + coords.lng + “&format=json”,
-{ headers: { “Accept-Language”: “en” } }
-)
-.then(r => r.json())
-.then(d => {
-const name = d.address?.suburb || d.address?.neighbourhood ||
-d.address?.city_district || d.address?.town || “Lagos”;
-onSave(name, coords);
-}).catch(() => onSave(“Lagos”, coords));
-setLocating(false);
-},
-() => { setLocating(false); alert(“Location access denied. Please type your area.”); }
-);
-}
+  function useMyLocation() {
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        fetch(
+          "https://nominatim.openstreetmap.org/reverse?lat=" + coords.lat +
+          "&lon=" + coords.lng + "&format=json",
+          { headers: { "Accept-Language": "en" } }
+        )
+          .then(r => r.json())
+          .then(d => {
+            const name = d.address?.suburb || d.address?.neighbourhood ||
+                         d.address?.city_district || d.address?.town || "Lagos";
+            onSave(name, coords);
+          }).catch(() => onSave("Lagos", coords));
+        setLocating(false);
+      },
+      () => { setLocating(false); alert("Location access denied. Please type your area."); }
+    );
+  }
 
-return (
-<div style={{
-position:“fixed”,inset:0,background:“rgba(0,0,0,0.85)”,
-display:“flex”,alignItems:“flex-end”,justifyContent:“center”,
-backdropFilter:“blur(8px)”,zIndex:9999
-}} onClick={onClose}>
-<div style={{
-background:“var(–surface)”,borderRadius:“20px 20px 0 0”,
-padding:“24px 20px 40px”,width:“100%”,maxWidth:430,
-border:“1px solid var(–border)”,borderBottom:“none”,
-animation:“slideUp 0.3s ease”
-}} onClick={e => e.stopPropagation()}>
-<div style={{fontFamily:“var(–font-head)”,fontSize:18,fontWeight:800,marginBottom:4}}>
-📍 Your Location
-</div>
-<div style={{fontSize:13,color:“var(–muted)”,marginBottom:20}}>
-We use this to show distances and nearby prices
-</div>
-
-```
-    <button onClick={useMyLocation} disabled={locating} style={{
-      width:"100%",background:"var(--green)",color:"#000",border:"none",
-      borderRadius:12,padding:"13px",fontFamily:"var(--font-head)",
-      fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:16,
-      opacity: locating ? 0.6 : 1
-    }}>
-      {locating ? "Detecting your location..." : "📡 Use My Current Location"}
-    </button>
-
-    <div style={{fontSize:11,color:"var(--muted)",textAlign:"center",marginBottom:12}}>— or type any Lagos area —</div>
-
-    <div style={{display:"flex",gap:8,marginBottom: suggestions.length > 0 ? 8 : 16}}>
-      <input
-        style={{
-          flex:1,background:"var(--bg)",border:"1.5px solid var(--border)",
-          borderRadius:12,padding:"12px 14px",fontFamily:"var(--font-body)",
-          fontSize:14,color:"var(--text)",outline:"none"
-        }}
-        placeholder="e.g. Mafoluku, Mushin, Gbagada..."
-        value={manual}
-        onChange={e => { setManual(e.target.value); setSuggestions([]); }}
-        onKeyDown={e => e.key === "Enter" && manual.trim() && geocodeLocation(manual.trim())}
-      />
-      <button
-        onClick={() => manual.trim() && geocodeLocation(manual.trim())}
-        disabled={geocoding}
-        style={{
-          background:"var(--green)",border:"none",color:"#000",
-          borderRadius:12,padding:"12px 16px",cursor:"pointer",
-          fontSize:13,fontWeight:700,fontFamily:"var(--font-body)",
-          opacity: geocoding ? 0.6 : 1
-        }}>
-        {geocoding ? "..." : "Find"}
-      </button>
-    </div>
-
-    {suggestions.length > 0 && (
+  return (
+    <div style={{
+      position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",
+      display:"flex",alignItems:"flex-end",justifyContent:"center",
+      backdropFilter:"blur(8px)",zIndex:9999
+    }} onClick={onClose}>
       <div style={{
-        background:"var(--surface2)",borderRadius:12,marginBottom:16,
-        border:"1px solid var(--border)",overflow:"hidden"
-      }}>
-        {suggestions.map((s, i) => (
-          <div key={i} onClick={() => { onSave(s.name, s.coords); setSuggestions([]); }} style={{
-            padding:"11px 14px",fontSize:13,cursor:"pointer",
-            borderBottom: i < suggestions.length-1 ? "1px solid var(--border)" : "none",
-            display:"flex",flexDirection:"column",gap:2
+        background:"var(--surface)",borderRadius:"20px 20px 0 0",
+        padding:"24px 20px 40px",width:"100%",maxWidth:430,
+        border:"1px solid var(--border)",borderBottom:"none",
+        animation:"slideUp 0.3s ease"
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{fontFamily:"var(--font-head)",fontSize:18,fontWeight:800,marginBottom:4}}>
+          📍 Your Location
+        </div>
+        <div style={{fontSize:13,color:"var(--muted)",marginBottom:20}}>
+          We use this to show distances and nearby prices
+        </div>
+
+        <button onClick={useMyLocation} disabled={locating} style={{
+          width:"100%",background:"var(--green)",color:"#000",border:"none",
+          borderRadius:12,padding:"13px",fontFamily:"var(--font-head)",
+          fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:16,
+          opacity: locating ? 0.6 : 1
+        }}>
+          {locating ? "Detecting your location..." : "📡 Use My Current Location"}
+        </button>
+
+        <div style={{fontSize:11,color:"var(--muted)",textAlign:"center",marginBottom:12}}>— or type any Lagos area —</div>
+
+        <div style={{display:"flex",gap:8,marginBottom: suggestions.length > 0 ? 8 : 16}}>
+          <input
+            style={{
+              flex:1,background:"var(--bg)",border:"1.5px solid var(--border)",
+              borderRadius:12,padding:"12px 14px",fontFamily:"var(--font-body)",
+              fontSize:14,color:"var(--text)",outline:"none"
+            }}
+            placeholder="e.g. Mafoluku, Mushin, Gbagada..."
+            value={manual}
+            onChange={e => { setManual(e.target.value); setSuggestions([]); }}
+            onKeyDown={e => e.key === "Enter" && manual.trim() && geocodeLocation(manual.trim())}
+          />
+          <button
+            onClick={() => manual.trim() && geocodeLocation(manual.trim())}
+            disabled={geocoding}
+            style={{
+              background:"var(--green)",border:"none",color:"#000",
+              borderRadius:12,padding:"12px 16px",cursor:"pointer",
+              fontSize:13,fontWeight:700,fontFamily:"var(--font-body)",
+              opacity: geocoding ? 0.6 : 1
+            }}>
+            {geocoding ? "..." : "Find"}
+          </button>
+        </div>
+
+        {suggestions.length > 0 && (
+          <div style={{
+            background:"var(--surface2)",borderRadius:12,marginBottom:16,
+            border:"1px solid var(--border)",overflow:"hidden"
           }}>
-            <div style={{fontWeight:600,color:"var(--text)"}}>{s.name}</div>
-            <div style={{fontSize:11,color:"var(--muted)"}}>{s.fullName.split(",").slice(1,3).join(",").trim()}</div>
+            {suggestions.map((s, i) => (
+              <div key={i} onClick={() => { onSave(s.name, s.coords); setSuggestions([]); }} style={{
+                padding:"11px 14px",fontSize:13,cursor:"pointer",
+                borderBottom: i < suggestions.length-1 ? "1px solid var(--border)" : "none",
+                display:"flex",flexDirection:"column",gap:2
+              }}>
+                <div style={{fontWeight:600,color:"var(--text)"}}>{s.name}</div>
+                <div style={{fontSize:11,color:"var(--muted)"}}>{s.fullName.split(",").slice(1,3).join(",").trim()}</div>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
+
+        <div style={{fontSize:11,color:"var(--muted)",marginBottom:10}}>Quick select</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+          {["Yaba","Lekki","Ikeja","Surulere","Oshodi","Mafoluku","Mushin","VI","Ajah","Gbagada","Festac","Ketu"].map(a => (
+            <div key={a} onClick={() => onSave(a, AREA_COORDS[a])} style={{
+              padding:"7px 14px",borderRadius:20,fontSize:12,cursor:"pointer",
+              background: current===a ? "var(--green)" : "var(--surface2)",
+              color: current===a ? "#000" : "var(--text)",
+              border:"1px solid " + (current===a ? "var(--green)" : "var(--border)"),
+              fontWeight: current===a ? 700 : 400
+            }}>{a}</div>
+          ))}
+        </div>
       </div>
-    )}
-
-    <div style={{fontSize:11,color:"var(--muted)",marginBottom:10}}>Quick select</div>
-    <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-      {["Yaba","Lekki","Ikeja","Surulere","Oshodi","Mafoluku","Mushin","VI","Ajah","Gbagada","Festac","Ketu"].map(a => (
-        <div key={a} onClick={() => onSave(a, AREA_COORDS[a])} style={{
-          padding:"7px 14px",borderRadius:20,fontSize:12,cursor:"pointer",
-          background: current===a ? "var(--green)" : "var(--surface2)",
-          color: current===a ? "#000" : "var(--text)",
-          border:"1px solid " + (current===a ? "var(--green)" : "var(--border)"),
-          fontWeight: current===a ? 700 : 400
-        }}>{a}</div>
-      ))}
     </div>
-  </div>
-</div>
-```
-
-);
+  );
 }
 
 function App() {
-const [tab,         setTab]         = useState(“home”);
-const [searchItem,  setSearchItem]  = useState(null);
-const [showSuccess, setShowSuccess] = useState(false);
-const [user,        setUser]        = useState(() => sb.restoreSession());
-const [userCoords,  setUserCoords]  = useState(null);
-const [locName,     setLocName]     = useState(“Lagos”);
-const [showLocModal,setShowLocModal]= useState(false);
+  const [tab,         setTab]         = useState("home");
+  const [searchItem,  setSearchItem]  = useState(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [user,        setUser]        = useState(() => sb.restoreSession());
+  const [userCoords,  setUserCoords]  = useState(null);
+  const [locName,     setLocName]     = useState("Lagos");
+  const [showLocModal,setShowLocModal]= useState(false);
 
-const handleSearch = (id) => { setSearchItem(id); setTab(“results”); };
-const handleSubmit = (type) => { setShowSuccess(type || “new”); };
-const handleAuth   = (u)    => { setUser(u); setTab(“home”); };
-const handleSignOut = ()    => { sb.signOut(); setUser(null); setTab(“home”); };
+  const handleSearch = (id) => { setSearchItem(id); setTab("results"); };
+  const handleSubmit = (type) => { setShowSuccess(type || "new"); };
+  const handleAuth   = (u)    => { setUser(u); setTab("home"); };
+  const handleSignOut = ()    => { sb.signOut(); setUser(null); setTab("home"); };
 
-useEffect(() => { if (tab !== “results”) setSearchItem(null); }, [tab]);
+  useEffect(() => { if (tab !== "results") setSearchItem(null); }, [tab]);
 
-// Request location on first load
-useEffect(() => {
-const saved = localStorage.getItem(“pp_coords”);
-const savedName = localStorage.getItem(“pp_locname”);
-if (saved) { setUserCoords(JSON.parse(saved)); setLocName(savedName || “Lagos”); return; }
-if (navigator.geolocation) {
-navigator.geolocation.getCurrentPosition(
-pos => {
-const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-setUserCoords(coords);
-localStorage.setItem(“pp_coords”, JSON.stringify(coords));
-// Reverse geocode area name
-fetch(“https://nominatim.openstreetmap.org/reverse?lat=” + coords.lat + “&lon=” + coords.lng + “&format=json”)
-.then(r => r.json())
-.then(d => {
-const name = d.address?.suburb || d.address?.neighbourhood || d.address?.city_district || “Lagos”;
-setLocName(name);
-localStorage.setItem(“pp_locname”, name);
-}).catch(() => {});
-},
-() => setShowLocModal(true) // permission denied — show manual entry
-);
-} else {
-setShowLocModal(true);
-}
-}, []);
+  // Request location on first load
+  useEffect(() => {
+    const saved = localStorage.getItem("pp_coords");
+    const savedName = localStorage.getItem("pp_locname");
+    if (saved) { setUserCoords(JSON.parse(saved)); setLocName(savedName || "Lagos"); return; }
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setUserCoords(coords);
+          localStorage.setItem("pp_coords", JSON.stringify(coords));
+          // Reverse geocode area name
+          fetch("https://nominatim.openstreetmap.org/reverse?lat=" + coords.lat + "&lon=" + coords.lng + "&format=json")
+            .then(r => r.json())
+            .then(d => {
+              const name = d.address?.suburb || d.address?.neighbourhood || d.address?.city_district || "Lagos";
+              setLocName(name);
+              localStorage.setItem("pp_locname", name);
+            }).catch(() => {});
+        },
+        () => setShowLocModal(true) // permission denied — show manual entry
+      );
+    } else {
+      setShowLocModal(true);
+    }
+  }, []);
 
-// Show auth screen if not logged in and tapping Add or Profile
-const requiresAuth = (t) => (t === “add” || t === “profile”) && !user;
-const handleTabClick = (t) => {
-if (requiresAuth(t)) { setTab(“auth”); return; }
-setTab(t);
-};
+  // Show auth screen if not logged in and tapping Add or Profile
+  const requiresAuth = (t) => (t === "add" || t === "profile") && !user;
+  const handleTabClick = (t) => {
+    if (requiresAuth(t)) { setTab("auth"); return; }
+    setTab(t);
+  };
 
-if (tab === “auth”) return (
-<div className="app">
-<AuthPage onAuth={handleAuth} />
-</div>
-);
-
-return (
-<div className="app">
-<div className="nav">
-<div className="nav-logo">Price<span>Pulse</span></div>
-<div style={{display:“flex”,alignItems:“center”,gap:8}}>
-{user && <div style={{fontSize:12,color:“var(–green)”,fontWeight:600}}>{user.name || user.email?.split(”@”)[0]}</div>}
-<div className=“nav-location” onClick={() => setShowLocModal(true)}>
-<span>📍</span> {locName} ▾
-</div>
-</div>
-</div>
-
-```
-  {tab === "home"     && <HomePage    onSearch={handleSearch} userCoords={userCoords} />}
-  {tab === "results"  && <ResultsPage itemId={searchItem || "rice"} userCoords={userCoords} />}
-  {tab === "add"      && <AddPage     onSubmit={handleSubmit} user={user} />}
-  {tab === "insights" && <InsightsPage />}
-  {tab === "profile"  && <ProfilePage user={user} onSignOut={handleSignOut} />}
-
-  {showLocModal && (
-    <LocationModal
-      current={locName}
-      onSave={(name, coords) => {
-        setLocName(name);
-        setUserCoords(coords);
-        localStorage.setItem("pp_locname", name);
-        if (coords) localStorage.setItem("pp_coords", JSON.stringify(coords));
-        setShowLocModal(false);
-      }}
-      onClose={() => setShowLocModal(false)}
-    />
-  )}
-
-  <div className="bottom-nav">
-    <div className={`nav-item ${tab==="home"?"active":""}`} onClick={() => handleTabClick("home")}>
-      <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>
-      Home
+  if (tab === "auth") return (
+    <div className="app">
+      <AuthPage onAuth={handleAuth} />
     </div>
-    <div className={`nav-item ${tab==="results"?"active":""}`} onClick={() => { setSearchItem("rice"); handleTabClick("results"); }}>
-      <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Search
-    </div>
-    <div className="nav-item" onClick={() => handleTabClick("add")}>
-      <div className="add-circle">
-        <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  );
+
+  return (
+    <div className="app">
+      <div className="nav">
+        <div className="nav-logo">Price<span>Pulse</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {user && <div style={{fontSize:12,color:"var(--green)",fontWeight:600}}>{user.name || user.email?.split("@")[0]}</div>}
+          <div className="nav-location" onClick={() => setShowLocModal(true)}>
+            <span>📍</span> {locName} ▾
+          </div>
+        </div>
       </div>
-    </div>
-    <div className={`nav-item ${tab==="insights"?"active":""}`} onClick={() => handleTabClick("insights")}>
-      <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-      Insights
-    </div>
-    <div className={`nav-item ${tab==="profile"?"active":""}`} onClick={() => handleTabClick("profile")}>
-      <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-      Profile
-    </div>
-  </div>
 
-  {showSuccess && (
-    <div className="success-overlay" onClick={() => { setShowSuccess(false); setTab("home"); }}>
-      <div className="success-card" onClick={e => e.stopPropagation()}>
-        <div className="success-icon">{showSuccess === "boosted" ? "🔥" : "🎉"}</div>
-        <div className="success-title">{showSuccess === "boosted" ? "Price Confirmed!" : "Price Reported!"}</div>
-        <div className="success-sub">{showSuccess === "boosted" ? "You boosted the confidence score for this store" : "Your data helps Lagos save money"}</div>
-        <div className="points-earned">{showSuccess === "boosted" ? "+10" : "+25"}</div>
-        <div className="points-label">points earned</div>
-        <button className="close-btn" onClick={() => { setShowSuccess(false); setTab("home"); }}>Back to Home</button>
+      {tab === "home"     && <HomePage    onSearch={handleSearch} userCoords={userCoords} />}
+      {tab === "results"  && <ResultsPage itemId={searchItem || "rice"} userCoords={userCoords} />}
+      {tab === "add"      && <AddPage     onSubmit={handleSubmit} user={user} />}
+      {tab === "insights" && <InsightsPage />}
+      {tab === "profile"  && <ProfilePage user={user} onSignOut={handleSignOut} />}
+
+      {showLocModal && (
+        <LocationModal
+          current={locName}
+          onSave={(name, coords) => {
+            setLocName(name);
+            setUserCoords(coords);
+            localStorage.setItem("pp_locname", name);
+            if (coords) localStorage.setItem("pp_coords", JSON.stringify(coords));
+            setShowLocModal(false);
+          }}
+          onClose={() => setShowLocModal(false)}
+        />
+      )}
+
+      <div className="bottom-nav">
+        <div className={`nav-item ${tab==="home"?"active":""}`} onClick={() => handleTabClick("home")}>
+          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>
+          Home
+        </div>
+        <div className={`nav-item ${tab==="results"?"active":""}`} onClick={() => { setSearchItem("rice"); handleTabClick("results"); }}>
+          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Search
+        </div>
+        <div className="nav-item" onClick={() => handleTabClick("add")}>
+          <div className="add-circle">
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </div>
+        </div>
+        <div className={`nav-item ${tab==="insights"?"active":""}`} onClick={() => handleTabClick("insights")}>
+          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+          Insights
+        </div>
+        <div className={`nav-item ${tab==="profile"?"active":""}`} onClick={() => handleTabClick("profile")}>
+          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Profile
+        </div>
       </div>
-    </div>
-  )}
-</div>
-```
 
-);
+      {showSuccess && (
+        <div className="success-overlay" onClick={() => { setShowSuccess(false); setTab("home"); }}>
+          <div className="success-card" onClick={e => e.stopPropagation()}>
+            <div className="success-icon">{showSuccess === "boosted" ? "🔥" : "🎉"}</div>
+            <div className="success-title">{showSuccess === "boosted" ? "Price Confirmed!" : "Price Reported!"}</div>
+            <div className="success-sub">{showSuccess === "boosted" ? "You boosted the confidence score for this store" : "Your data helps Lagos save money"}</div>
+            <div className="points-earned">{showSuccess === "boosted" ? "+10" : "+25"}</div>
+            <div className="points-label">points earned</div>
+            <button className="close-btn" onClick={() => { setShowSuccess(false); setTab("home"); }}>Back to Home</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
-ReactDOM.createRoot(document.getElementById(“root”)).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 
 <!-- SERVICE WORKER + INSTALL PROMPT + UPDATE TOAST -->
-
 <script>
 const APP_VERSION = 'pricepulse-v1'; // bump this on every meaningful update
 
@@ -1514,61 +1486,90 @@ if ('serviceWorker' in navigator) {
             to{opacity:1;transform:translateX(-50%) translateY(0);}
           }
         </style>
+      `;
+      document.body.appendChild(toast);
 
-```
-  `;
-  document.body.appendChild(toast);
-
-  document.getElementById('update-btn').addEventListener('click', () => {
-    worker.postMessage('SKIP_WAITING');
-    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
-    toast.remove();
-  });
-  document.getElementById('later-btn').addEventListener('click', () => toast.remove());
-}
-
-if (reg.waiting) showUpdateToast(reg.waiting);
-
-reg.addEventListener('updatefound', () => {
-  const nw = reg.installing;
-  nw.addEventListener('statechange', () => {
-    if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-      showUpdateToast(nw);
+      document.getElementById('update-btn').addEventListener('click', () => {
+        worker.postMessage('SKIP_WAITING');
+        navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+        toast.remove();
+      });
+      document.getElementById('later-btn').addEventListener('click', () => toast.remove());
     }
-  });
-});
-```
 
-}).catch(() => {});
+    if (reg.waiting) showUpdateToast(reg.waiting);
 
-// Check for updates every 60 seconds while app is open
-setInterval(() => {
-navigator.serviceWorker.getRegistration().then(reg => { if (reg) reg.update(); });
-}, 60000);
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateToast(nw);
+        }
+      });
+    });
+
+  }).catch(() => {});
+
+  // Check for updates every 60 seconds while app is open
+  setInterval(() => {
+    navigator.serviceWorker.getRegistration().then(reg => { if (reg) reg.update(); });
+  }, 60000);
 }
 
-// ── INSTALL PROMPT — “Add to Home Screen” ────────────────────────────────────
+// ── INSTALL PROMPT — "Add to Home Screen" ────────────────────────────────────
 let deferredPrompt;
-window.addEventListener(‘beforeinstallprompt’, e => {
-e.preventDefault();
-deferredPrompt = e;
-setTimeout(() => {
-if (!deferredPrompt) return;
-const banner = document.createElement(‘div’);
-banner.id = ‘install-banner’;
-banner.innerHTML = `<div style=" position:fixed;bottom:80px;left:50%;transform:translateX(-50%); width:calc(100% - 40px);max-width:390px; background:#161616;border:1px solid #00C48C; border-radius:14px;padding:12px 16px; display:flex;align-items:center;justify-content:space-between; gap:12px;z-index:999;box-shadow:0 4px 24px rgba(0,196,140,0.2); font-family:'DM Sans',sans-serif;animation:slideUp 0.3s ease; "> <div style="display:flex;align-items:center;gap:10px;"> <span style="font-size:24px">⚡</span> <div> <div style="font-size:13px;font-weight:700;color:#F5F5F0;">Add to Home Screen</div> <div style="font-size:11px;color:#888;">Use PricePulse like a real app</div> </div> </div> <div style="display:flex;gap:8px;flex-shrink:0;"> <button id="install-btn" style=" background:#00C48C;color:#000;border:none;border-radius:8px; padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer; font-family:'DM Sans',sans-serif; ">Install</button> <button id="dismiss-btn" style=" background:transparent;color:#888;border:1px solid #2A2A2A; border-radius:8px;padding:8px 10px;font-size:12px;cursor:pointer; font-family:'DM Sans',sans-serif; ">x</button> </div> </div> <style> @keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px);}to{opacity:1;transform:translateX(-50%) translateY(0);}} </style>`;
-document.body.appendChild(banner);
-document.getElementById(‘install-btn’).addEventListener(‘click’, async () => {
-if (!deferredPrompt) return;
-deferredPrompt.prompt();
-const { outcome } = await deferredPrompt.userChoice;
-deferredPrompt = null;
-banner.remove();
-});
-document.getElementById(‘dismiss-btn’).addEventListener(‘click’, () => banner.remove());
-}, 30000);
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  setTimeout(() => {
+    if (!deferredPrompt) return;
+    const banner = document.createElement('div');
+    banner.id = 'install-banner';
+    banner.innerHTML = `
+      <div style="
+        position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+        width:calc(100% - 40px);max-width:390px;
+        background:#161616;border:1px solid #00C48C;
+        border-radius:14px;padding:12px 16px;
+        display:flex;align-items:center;justify-content:space-between;
+        gap:12px;z-index:999;box-shadow:0 4px 24px rgba(0,196,140,0.2);
+        font-family:'DM Sans',sans-serif;animation:slideUp 0.3s ease;
+      ">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:24px">⚡</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#F5F5F0;">Add to Home Screen</div>
+            <div style="font-size:11px;color:#888;">Use PricePulse like a real app</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          <button id="install-btn" style="
+            background:#00C48C;color:#000;border:none;border-radius:8px;
+            padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;
+            font-family:'DM Sans',sans-serif;
+          ">Install</button>
+          <button id="dismiss-btn" style="
+            background:transparent;color:#888;border:1px solid #2A2A2A;
+            border-radius:8px;padding:8px 10px;font-size:12px;cursor:pointer;
+            font-family:'DM Sans',sans-serif;
+          ">x</button>
+        </div>
+      </div>
+      <style>
+        @keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+      </style>
+    `;
+    document.body.appendChild(banner);
+    document.getElementById('install-btn').addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      banner.remove();
+    });
+    document.getElementById('dismiss-btn').addEventListener('click', () => banner.remove());
+  }, 30000);
 });
 </script>
-
 </body>
 </html>
